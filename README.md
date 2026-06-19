@@ -2,18 +2,23 @@
 
 [![CI](https://github.com/SauceTaster/vibe-libgphoto2-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/SauceTaster/vibe-libgphoto2-rs/actions/workflows/ci.yml)
 
-A Rust rewrite of [libgphoto2](https://github.com/gphoto/libgphoto2) — the library
-behind `gphoto2`, digiKam, Darktable tethering, Entangle and friends, which can
-talk to [~2700 camera models](http://www.gphoto.org/proj/libgphoto2/support.php)
+**Safe Rust bindings to [libgphoto2](https://github.com/gphoto/libgphoto2)** — the
+C library behind `gphoto2`, digiKam, Darktable tethering, Entangle and friends,
+which talks to [~2700 camera models](http://www.gphoto.org/proj/libgphoto2/support.php)
 over USB, PTP/MTP, serial and IP.
 
-Rewriting a 25-year-old, 2700-driver C library in one sitting is not a thing.
-This repo takes the **strangler-fig** approach instead: stand up a safe,
-well-tested Rust surface *on top of* the proven C library today, then replace
-the internals with pure Rust piece by piece without ever breaking the public API.
+**What this is today:** a raw FFI crate (`gphoto2-sys`) and a safe, idiomatic
+wrapper (`gphoto2`) that link and call into the existing C library. It does
+**not** reimplement libgphoto2 in Rust — it *binds* it. If you want to talk to a
+camera from Rust today, that's exactly what this provides.
 
-> **Status:** Foundation. A complete `-sys` layer plus a safe wrapper that can
-> enumerate cameras, read abilities, capture, and download. See the
+**Where it's heading:** the long-term aspiration is a pure-Rust implementation
+that could replace the C internals behind this same safe API. That's a big,
+open-ended direction and is **not started** — so for now, treat this as bindings,
+not a rewrite.
+
+> **Status:** Usable bindings. Enumerate cameras, read abilities and the config
+> (widget) tree, capture, and download — all through the C library. See the
 > [roadmap](#roadmap).
 
 ## Workspace layout
@@ -23,14 +28,14 @@ crates/
   gphoto2-sys/   Raw FFI bindings + native linkage to libgphoto2 & libgphoto2_port
   gphoto2/       Safe, idiomatic Rust API (RAII, Result, structured errors)
 vendor/
-  libgphoto2/    Pinned upstream source (v2.5.34) — reference + future vendored build
+  libgphoto2/    Pinned upstream source (v2.5.34), as a submodule — reference only
 ```
 
-The two-crate split mirrors libgphoto2's own `libgphoto2` / `libgphoto2_port`
-separation and follows the standard Rust `foo-sys` + `foo` convention (à la
-`libgit2-sys` / `git2`). The `-sys` crate is the seam: as logic is ported to
-Rust, modules move *up* out of the C library and into safe Rust, while the
-public `gphoto2` API stays put.
+The two-crate split follows the standard Rust `foo-sys` + `foo` convention (à la
+`libgit2-sys` / `git2`) and mirrors libgphoto2's own `libgphoto2` /
+`libgphoto2_port` separation. Keeping a stable safe API on top leaves room to
+swap the implementation underneath later — but today every call goes straight
+through to the C library.
 
 ## Quick start
 
@@ -132,28 +137,33 @@ Picked deliberately for a library meant to live a long time:
 - **`thiserror`/`anyhow` deliberately avoided** in the core — the error type is a
   thin hand-rolled wrapper over libgphoto2's integer codes, so the public API
   carries no third-party type in its signatures.
-- **Planned (port-layer rewrite):** [`nusb`](https://crates.io/crates/nusb)
-  (pure-Rust USB, no system libusb) over `rusb`/`libusb`, and
-  [`serialport`](https://crates.io/crates/serialport). Choosing `nusb` is what
-  eventually lets the USB/PTP path drop the C dependency entirely.
+- **Aspirational (only if a pure-Rust port ever happens):**
+  [`nusb`](https://crates.io/crates/nusb) (pure-Rust USB, no system libusb) over
+  `rusb`/`libusb`, and [`serialport`](https://crates.io/crates/serialport). These
+  are **not** current dependencies — listed only to record the intended direction.
 
 ## Roadmap
 
-The strangler-fig order — each step ships behind the unchanged `gphoto2` API:
+Near-term work stays in the bindings layer. The pure-Rust items are a long-term
+aspiration — a direction, not a commitment or a schedule.
 
-1. **Foundation (done)** — `-sys` bindings, safe RAII wrapper, autodetect /
-   open-by-model+port / abilities / folder+file listing / capture / download /
-   `supported_models` / **config (widget) tree**, cross-platform `build.rs`, plus
-   unit tests and hardware-free virtual-camera integration tests.
-2. **Widen the safe API** — events (`wait_for_event`), preview/liveview, storage
-   info, recursive listing helpers, context callbacks (progress/cancel) bridged
-   to Rust closures.
-3. **Pure-Rust I/O port layer** — reimplement `libgphoto2_port` (USB via `nusb`,
-   serial via `serialport`) and select it at runtime, dropping libusb.
-4. **Pure-Rust PTP/MTP driver** — port the `ptp2` camlib (covers the large
-   majority of modern cameras) to Rust on top of the new port layer.
-5. **Remaining drivers** — port or bridge the long tail; keep the C fallback for
-   anything not yet rewritten.
+**Now — bindings & safe wrapper**
+
+1. **Done** — `-sys` bindings, safe RAII wrapper, autodetect / open-by-model+port
+   / abilities / folder+file listing / capture / download / `supported_models` /
+   config (widget) tree, cross-platform `build.rs`, plus unit tests and
+   hardware-free virtual-camera integration tests.
+2. **Next** — events (`wait_for_event`), preview/liveview, storage info,
+   recursive listing helpers, context callbacks (progress/cancel) as Rust closures.
+
+**Maybe later — pure Rust (aspirational, not started)**
+
+3. A pure-Rust I/O port layer (USB via `nusb`, serial via `serialport`).
+4. A pure-Rust PTP/MTP driver (the `ptp2` camlib covers most modern cameras).
+5. The long tail of drivers, keeping the C library as the fallback.
+
+Until and unless that happens, this is a binding to the C library — and that's
+the honest framing.
 
 ## Licensing
 
