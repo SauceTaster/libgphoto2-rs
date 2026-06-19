@@ -42,6 +42,8 @@ pub mod context;
 pub mod error;
 pub mod events;
 pub mod file;
+pub mod info;
+pub mod storage;
 pub mod version;
 pub mod widget;
 
@@ -56,7 +58,9 @@ pub use camera::{Camera, CameraDescriptor, CameraFilePath};
 pub use context::{Context, ProgressHandler};
 pub use error::{Error, ErrorKind, Result};
 pub use events::CameraEvent;
-pub use file::CameraFile;
+pub use file::{CameraFile, FileType};
+pub use info::{FileInfo, FilePermissions};
+pub use storage::{AccessType, FilesystemType, StorageInfo, StorageType};
 pub use version::{library_version, library_version_verbose};
 pub use widget::{Widget, WidgetType, WidgetValue};
 
@@ -64,6 +68,6 @@ pub use widget::{Widget, WidgetType, WidgetValue};
 pub mod prelude {
     pub use crate::{
         Abilities, Camera, CameraDescriptor, CameraEvent, CameraFile, CameraFilePath, Context,
-        Error, ErrorKind, Result, Widget, WidgetType, WidgetValue,
+        Error, ErrorKind, FileInfo, FileType, Result, StorageInfo, Widget, WidgetType, WidgetValue,
     };
 }

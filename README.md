@@ -150,14 +150,17 @@ aspiration — a direction, not a commitment or a schedule.
 **Now — bindings & safe wrapper**
 
 1. **Done** — `-sys` bindings, safe RAII wrapper, autodetect / open-by-model+port
-   / abilities / folder+file listing / capture / download / `supported_models` /
-   config (widget) tree / events (`wait_for_event`) + tethered `trigger_capture`
-   + liveview `capture_preview` / **context callbacks (progress, cancel,
-   message/status/error) as Rust closures**, cross-platform `build.rs`, plus unit
-   tests (the unsafe callback bridging is Miri-checked) and hardware-free
-   virtual-camera integration tests.
-2. **Next** — file operations (delete, upload, get info), richer file-type
-   downloads (RAW/EXIF/preview), storage info, and recursive listing helpers.
+   / abilities / capture / download / `supported_models` / config (widget) tree /
+   events (`wait_for_event`) + tethered `trigger_capture` + liveview
+   `capture_preview` / context callbacks (progress, cancel, message/status/error)
+   as Rust closures / **filesystem management (list, typed downloads, file info,
+   delete, upload, mkdir/rmdir, delete-all, recursive walk, storage info) +
+   about/manual text**, cross-platform `build.rs`, plus unit tests (the unsafe
+   callback bridging is Miri-checked) and hardware-free virtual-camera
+   integration tests.
+2. **Next** — capability introspection (which operations a model supports),
+   a libgphoto2 logging → `tracing`/`log` bridge, and a thread-safe (`Send`)
+   camera-session story for use from worker/async threads.
 
 **Maybe later — pure Rust (aspirational, not started)**
 

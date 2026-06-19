@@ -14,7 +14,10 @@ use std::rc::Rc;
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use gphoto2::{supported_models, Camera, CameraFilePath, Context, ErrorKind, ProgressHandler};
+use gphoto2::{
+    supported_models, AccessType, Camera, CameraFile, CameraFilePath, Context, ErrorKind,
+    ProgressHandler,
+};
 
 /// libgphoto2 loads drivers via global ltdl/dlopen state; serialise the tests
 /// that spin up cameras so parallel runs can't race on it.
@@ -213,6 +216,124 @@ fn progress_handler_observes_a_listing() {
     let log = log.borrow();
     assert!(log.started, "progress start should have fired");
     assert!(log.stopped, "progress stop should have fired");
+}
+
+#[test]
+fn file_info_reports_size_and_mime() {
+    let _g = lock();
+    let tmp = TempDir::new("info");
+    let bytes = b"pretend jpeg bytes, only the extension matters here";
+    fs::write(tmp.path().join("photo.jpg"), bytes).unwrap();
+
+    let ctx = Context::new().unwrap();
+    let camera = open_directory_camera(&ctx, tmp.path()).expect("open directory camera");
+    let info = camera.file_info(&ctx, "/", "photo.jpg").unwrap();
+
+    assert_eq!(info.size, Some(bytes.len() as u64));
+    assert!(
+        info.mime_type.as_deref().unwrap_or("").contains("jpeg"),
+        "mime: {:?}",
+        info.mime_type
+    );
+}
+
+#[test]
+fn upload_then_download_round_trip() {
+    let _g = lock();
+    let tmp = TempDir::new("upload");
+    let ctx = Context::new().unwrap();
+    let camera = open_directory_camera(&ctx, tmp.path()).expect("open directory camera");
+
+    let payload = b"freshly uploaded contents";
+    let file = CameraFile::from_bytes("up.jpg", "image/jpeg", payload).unwrap();
+    camera.upload(&ctx, "/", &file).unwrap();
+
+    // Independent of libgphoto2's cache: the bytes really landed on disk.
+    assert_eq!(fs::read(tmp.path().join("up.jpg")).unwrap(), payload);
+
+    // And the camera can read them back.
+    let path = CameraFilePath {
+        folder: "/".into(),
+        name: "up.jpg".into(),
+    };
+    let downloaded = camera.download(&ctx, &path).unwrap();
+    assert_eq!(downloaded.data().unwrap(), payload);
+}
+
+#[test]
+fn delete_file_removes_it() {
+    let _g = lock();
+    let tmp = TempDir::new("delete");
+    fs::write(tmp.path().join("doomed.jpg"), b"x").unwrap();
+
+    let ctx = Context::new().unwrap();
+    let camera = open_directory_camera(&ctx, tmp.path()).expect("open directory camera");
+    assert!(camera
+        .list_files(&ctx, "/")
+        .unwrap()
+        .iter()
+        .any(|f| f == "doomed.jpg"));
+
+    camera.delete_file(&ctx, "/", "doomed.jpg").unwrap();
+    assert!(!tmp.path().join("doomed.jpg").exists());
+}
+
+#[test]
+fn make_and_remove_dir() {
+    let _g = lock();
+    let tmp = TempDir::new("dirs");
+    let ctx = Context::new().unwrap();
+    let camera = open_directory_camera(&ctx, tmp.path()).expect("open directory camera");
+
+    camera.make_dir(&ctx, "/", "newdir").unwrap();
+    assert!(tmp.path().join("newdir").is_dir());
+
+    camera.remove_dir(&ctx, "/", "newdir").unwrap();
+    assert!(!tmp.path().join("newdir").exists());
+}
+
+#[test]
+fn storage_info_describes_the_directory() {
+    let _g = lock();
+    let tmp = TempDir::new("storage");
+    let ctx = Context::new().unwrap();
+    let camera = open_directory_camera(&ctx, tmp.path()).expect("open directory camera");
+
+    let storages = camera.storage_info(&ctx).unwrap();
+    assert!(!storages.is_empty(), "directory driver reports one storage");
+    assert_eq!(storages[0].base_dir.as_deref(), Some("/"));
+    assert_eq!(storages[0].access, Some(AccessType::ReadWrite));
+}
+
+#[test]
+fn about_and_manual_are_available() {
+    let _g = lock();
+    let tmp = TempDir::new("about");
+    let ctx = Context::new().unwrap();
+    let camera = open_directory_camera(&ctx, tmp.path()).expect("open directory camera");
+
+    assert!(!camera.about(&ctx).unwrap().is_empty());
+    assert!(!camera.manual(&ctx).unwrap().is_empty());
+}
+
+#[test]
+fn recursive_listing_finds_nested_files() {
+    let _g = lock();
+    let tmp = TempDir::new("walk");
+    fs::write(tmp.path().join("top.jpg"), b"a").unwrap();
+    fs::create_dir(tmp.path().join("sub")).unwrap();
+    fs::write(tmp.path().join("sub").join("inner.jpg"), b"b").unwrap();
+
+    let ctx = Context::new().unwrap();
+    let camera = open_directory_camera(&ctx, tmp.path()).expect("open directory camera");
+    let all = camera.list_files_recursive(&ctx, "/").unwrap();
+
+    let paths: Vec<String> = all
+        .iter()
+        .map(|p| format!("{}/{}", p.folder.trim_end_matches('/'), p.name))
+        .collect();
+    assert!(paths.iter().any(|p| p == "/top.jpg"), "{paths:?}");
+    assert!(paths.iter().any(|p| p == "/sub/inner.jpg"), "{paths:?}");
 }
 
 #[test]

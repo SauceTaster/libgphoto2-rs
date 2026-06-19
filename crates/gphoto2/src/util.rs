@@ -1,7 +1,29 @@
-//! Small internal helpers for converting C strings to owned `String`s.
+//! Small internal helpers for converting C strings and releasing C allocations.
 
-use core::ffi::c_char;
+use core::ffi::{c_char, c_void};
 use std::ffi::CStr;
+
+// libgphoto2 hands back malloc'd buffers (event payloads, storage-info arrays)
+// that the caller must release. We bind libc `free` directly rather than pull in
+// the `libc` crate. Sound only when this binary and libgphoto2 share one C
+// allocator, which holds on every supported configuration: a single system libc
+// on Linux/macOS, and on Windows the MSYS2/MINGW64 toolchain where the camlib
+// DLLs and this crate link the same MinGW CRT.
+extern "C" {
+    fn free(ptr: *mut c_void);
+}
+
+/// Free a pointer that libgphoto2 allocated for us. No-op on null.
+///
+/// # Safety
+/// `ptr` must be null or a live allocation from libgphoto2's C allocator that
+/// has not already been freed.
+pub(crate) unsafe fn libc_free(ptr: *mut c_void) {
+    if !ptr.is_null() {
+        // SAFETY: caller guarantees `ptr` is a live C allocation.
+        unsafe { free(ptr) };
+    }
+}
 
 /// Convert a borrowed, NUL-terminated C string pointer to an owned `String`.
 /// Returns an empty string for null pointers. Lossy on invalid UTF-8.

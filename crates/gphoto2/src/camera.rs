@@ -12,10 +12,12 @@ use crate::abilities_list::AbilitiesList;
 use crate::context::Context;
 use crate::error::{check, Error, Result};
 use crate::events::{interpret_event, CameraEvent};
-use crate::file::CameraFile;
+use crate::file::{CameraFile, FileType};
+use crate::info::FileInfo;
 use crate::list::List;
 use crate::port::PortInfoList;
-use crate::util::fixed_buf_to_string;
+use crate::storage::StorageInfo;
+use crate::util::{fixed_buf_to_string, libc_free};
 use crate::widget::Widget;
 
 /// A camera discovered on a port: its model name and gphoto2 port path
@@ -195,6 +197,17 @@ impl Camera {
 
     /// Download the normal (full-resolution) view of a file from the camera.
     pub fn download(&self, context: &Context, path: &CameraFilePath) -> Result<CameraFile> {
+        self.download_typed(context, path, FileType::Normal)
+    }
+
+    /// Download a specific [`FileType`] view of a file (e.g. a thumbnail
+    /// [`FileType::Preview`], the [`FileType::Exif`] block, or [`FileType::Raw`]).
+    pub fn download_typed(
+        &self,
+        context: &Context,
+        path: &CameraFilePath,
+        file_type: FileType,
+    ) -> Result<CameraFile> {
         let folder = to_cstring(&path.folder)?;
         let name = to_cstring(&path.name)?;
         let file = CameraFile::new()?;
@@ -203,12 +216,171 @@ impl Camera {
                 self.inner,
                 folder.as_ptr(),
                 name.as_ptr(),
-                sys::CameraFileType::GP_FILE_TYPE_NORMAL,
+                file_type.to_raw(),
                 file.as_ptr(),
                 context.as_ptr(),
             )
         })?;
         Ok(file)
+    }
+
+    /// Metadata (size, MIME type, dimensions, mtime, permissions) for a file,
+    /// without downloading it. Fields are present only if the camera reports them.
+    pub fn file_info(&self, context: &Context, folder: &str, name: &str) -> Result<FileInfo> {
+        let cfolder = to_cstring(folder)?;
+        let cname = to_cstring(name)?;
+        // SAFETY: CameraFileInfo is plain data; zero-init then libgphoto2 fills it.
+        let mut info: sys::CameraFileInfo = unsafe { core::mem::zeroed() };
+        check(unsafe {
+            sys::gp_camera_file_get_info(
+                self.inner,
+                cfolder.as_ptr(),
+                cname.as_ptr(),
+                &mut info,
+                context.as_ptr(),
+            )
+        })?;
+        Ok(FileInfo::from_raw(&info))
+    }
+
+    /// Delete a single file from the camera.
+    pub fn delete_file(&self, context: &Context, folder: &str, name: &str) -> Result<()> {
+        let cfolder = to_cstring(folder)?;
+        let cname = to_cstring(name)?;
+        check(unsafe {
+            sys::gp_camera_file_delete(
+                self.inner,
+                cfolder.as_ptr(),
+                cname.as_ptr(),
+                context.as_ptr(),
+            )
+        })?;
+        Ok(())
+    }
+
+    /// Upload a file into `folder` on the camera. The target filename is the
+    /// file's own [`name`](CameraFile::name) (set via
+    /// [`CameraFile::from_bytes`]).
+    pub fn upload(&self, context: &Context, folder: &str, file: &CameraFile) -> Result<()> {
+        let cfolder = to_cstring(folder)?;
+        let cname = to_cstring(&file.name()?)?;
+        check(unsafe {
+            sys::gp_camera_folder_put_file(
+                self.inner,
+                cfolder.as_ptr(),
+                cname.as_ptr(),
+                FileType::Normal.to_raw(),
+                file.as_ptr(),
+                context.as_ptr(),
+            )
+        })?;
+        Ok(())
+    }
+
+    /// Create a sub-directory `name` inside `folder`.
+    pub fn make_dir(&self, context: &Context, folder: &str, name: &str) -> Result<()> {
+        let cfolder = to_cstring(folder)?;
+        let cname = to_cstring(name)?;
+        check(unsafe {
+            sys::gp_camera_folder_make_dir(
+                self.inner,
+                cfolder.as_ptr(),
+                cname.as_ptr(),
+                context.as_ptr(),
+            )
+        })?;
+        Ok(())
+    }
+
+    /// Remove the sub-directory `name` inside `folder`.
+    pub fn remove_dir(&self, context: &Context, folder: &str, name: &str) -> Result<()> {
+        let cfolder = to_cstring(folder)?;
+        let cname = to_cstring(name)?;
+        check(unsafe {
+            sys::gp_camera_folder_remove_dir(
+                self.inner,
+                cfolder.as_ptr(),
+                cname.as_ptr(),
+                context.as_ptr(),
+            )
+        })?;
+        Ok(())
+    }
+
+    /// Delete all files in `folder` (non-recursively).
+    pub fn delete_all(&self, context: &Context, folder: &str) -> Result<()> {
+        let cfolder = to_cstring(folder)?;
+        check(unsafe {
+            sys::gp_camera_folder_delete_all(self.inner, cfolder.as_ptr(), context.as_ptr())
+        })?;
+        Ok(())
+    }
+
+    /// Every file under `folder`, recursing into sub-folders (depth-first).
+    pub fn list_files_recursive(
+        &self,
+        context: &Context,
+        folder: &str,
+    ) -> Result<Vec<CameraFilePath>> {
+        let mut out = Vec::new();
+        self.walk(context, folder, &mut out)?;
+        Ok(out)
+    }
+
+    fn walk(&self, context: &Context, folder: &str, out: &mut Vec<CameraFilePath>) -> Result<()> {
+        for name in self.list_files(context, folder)? {
+            out.push(CameraFilePath {
+                folder: folder.to_owned(),
+                name,
+            });
+        }
+        for sub in self.list_folders(context, folder)? {
+            let child = if folder.ends_with('/') {
+                format!("{folder}{sub}")
+            } else {
+                format!("{folder}/{sub}")
+            };
+            self.walk(context, &child, out)?;
+        }
+        Ok(())
+    }
+
+    /// A driver-provided "about" text (authors, credits, notes).
+    pub fn about(&self, context: &Context) -> Result<String> {
+        let mut text = sys::CameraText {
+            text: [0; 32 * 1024],
+        };
+        check(unsafe { sys::gp_camera_get_about(self.inner, &mut text, context.as_ptr()) })?;
+        Ok(fixed_buf_to_string(&text.text))
+    }
+
+    /// A driver-provided manual / usage notes text.
+    pub fn manual(&self, context: &Context) -> Result<String> {
+        let mut text = sys::CameraText {
+            text: [0; 32 * 1024],
+        };
+        check(unsafe { sys::gp_camera_get_manual(self.inner, &mut text, context.as_ptr()) })?;
+        Ok(fixed_buf_to_string(&text.text))
+    }
+
+    /// Information about the camera's storages (capacity, free space, type).
+    pub fn storage_info(&self, context: &Context) -> Result<Vec<StorageInfo>> {
+        let mut ptr: *mut sys::CameraStorageInformation = core::ptr::null_mut();
+        let mut count: c_int = 0;
+        check(unsafe {
+            sys::gp_camera_get_storageinfo(self.inner, &mut ptr, &mut count, context.as_ptr())
+        })?;
+        if ptr.is_null() || count <= 0 {
+            return Ok(Vec::new());
+        }
+        let mut out = Vec::with_capacity(count as usize);
+        for i in 0..count as usize {
+            // SAFETY: libgphoto2 returned an array of `count` valid structs.
+            out.push(StorageInfo::from_raw(unsafe { &*ptr.add(i) }));
+        }
+        // SAFETY: the array was malloc'd by libgphoto2 for the caller to free.
+        unsafe { libc_free(ptr.cast::<c_void>()) };
+        Ok(out)
     }
 
     /// List the sub-folders of `folder` (an absolute camera path, e.g. `"/"`).
