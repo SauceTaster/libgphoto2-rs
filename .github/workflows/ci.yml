@@ -106,7 +106,9 @@ jobs:
       - name: Install build deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y meson ninja-build libltdl-dev pkg-config gettext clang libclang-dev
+          sudo apt-get install -y ninja-build libltdl-dev pkg-config gettext clang libclang-dev
+          # apt's meson is too old for libgphoto2 (needs >= 1.4.0); use pipx.
+          pipx install meson
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Build vusb libgphoto2 + run vcamera tests
