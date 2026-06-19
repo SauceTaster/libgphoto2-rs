@@ -1,0 +1,33 @@
+[package]
+name = "gphoto2-sys"
+version = "0.1.0"
+description = "Raw FFI bindings to the libgphoto2 C library (libgphoto2 + libgphoto2_port)"
+keywords = ["gphoto2", "camera", "ptp", "ffi", "bindings"]
+categories = ["external-ffi-bindings", "hardware-support"]
+readme = "README.md"
+# `links` is the -sys convention: it lets Cargo enforce a single native lib
+# version across the dep graph and lets dependents read our build metadata.
+links = "gphoto2"
+build = "build.rs"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[features]
+# Default: regenerate bindings at build time so they always match the installed
+# libgphoto2 ABI on *this* platform (the correctness-first choice). Requires
+# libclang to be present. Disable it (`--no-default-features`) to fall back to
+# the committed bindings in `src/bindings_pregenerated.rs`.
+default = ["buildtime-bindgen"]
+buildtime-bindgen = ["dep:bindgen"]
+
+[build-dependencies]
+pkg-config = "0.3"
+bindgen = { version = "0.71", optional = true }
+
+# docs.rs has no system libgphoto2: build against the committed bindings and
+# skip the link step entirely (handled by the DOCS_RS check in build.rs).
+[package.metadata.docs.rs]
+no-default-features = true

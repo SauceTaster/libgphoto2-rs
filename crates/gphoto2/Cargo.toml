@@ -1,0 +1,33 @@
+[package]
+name = "gphoto2"
+version = "0.1.0"
+description = "Safe, idiomatic Rust bindings to libgphoto2: detect, capture, download and inspect digital cameras"
+keywords = ["gphoto2", "camera", "ptp", "photography", "usb"]
+categories = ["api-bindings", "hardware-support", "multimedia"]
+readme = "README.md"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+# NOTE: the published name `gphoto2` is already taken on crates.io by an
+# unrelated wrapper. This is fine for local/workspace use; pick a final
+# publishable name before any `cargo publish`.
+
+[features]
+# Forwarded to gphoto2-sys: regenerate FFI bindings at build time (default) vs.
+# use the committed pregenerated bindings (`--no-default-features`).
+default = ["buildtime-bindgen"]
+buildtime-bindgen = ["gphoto2-sys/buildtime-bindgen"]
+
+[dependencies]
+gphoto2-sys = { workspace = true, default-features = false }
+
+[[example]]
+name = "detect"
+path = "examples/detect.rs"
+
+[[example]]
+name = "config"
+path = "examples/config.rs"
