@@ -323,7 +323,9 @@ fn to_cstring(s: &str) -> Result<CString> {
     CString::new(s).map_err(|_| Error::new(sys::GP_ERROR_BAD_PARAMETERS))
 }
 
-#[cfg(test)]
+// These build a real widget tree via the C API, so they call into libgphoto2
+// and can't run under Miri (no FFI execution); excluded there.
+#[cfg(all(test, not(miri)))]
 mod tests {
     use super::*;
 

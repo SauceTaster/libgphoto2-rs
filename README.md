@@ -124,6 +124,14 @@ cargo test --no-default-features # same, against the committed bindings
   ./scripts/run-vcamera-tests.sh     # needs meson + ninja + libltdl
   ```
 
+- **Miri** — the pure-unsafe paths (callback trampolines, event-data
+  `malloc`/`free`, string marshalling, ABI guards) run under Miri/Stacked Borrows
+  in CI (`cargo miri test --workspace --lib`); FFI-calling tests are excluded via
+  `cfg(miri)`.
+- **AddressSanitizer** — the `asan` CI lane builds libgphoto2 (vusb+ptp2) with
+  ASan and runs the vcamera tests instrumented (`scripts/run-vcamera-asan.sh`),
+  catching out-of-bounds / use-after-free across the Rust↔C boundary at runtime.
+
 ## Platform support
 
 | Platform | State | Notes |

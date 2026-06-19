@@ -34,7 +34,8 @@ fn collect(verbosity: sys::GPVersionVerbosity) -> Vec<String> {
     out
 }
 
-#[cfg(test)]
+// Calls into libgphoto2 (gp_library_version), so excluded under Miri.
+#[cfg(all(test, not(miri)))]
 mod tests {
     use super::*;
 

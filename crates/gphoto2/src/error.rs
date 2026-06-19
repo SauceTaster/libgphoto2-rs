@@ -210,6 +210,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "calls into libgphoto2 (gp_result_as_string)")]
     fn message_and_display_are_populated() {
         // `message` calls into libgphoto2's gp_result_as_string.
         let err = Error::new(sys::GP_ERROR_MODEL_NOT_FOUND);

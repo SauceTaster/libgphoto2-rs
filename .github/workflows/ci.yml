@@ -113,3 +113,43 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Build vusb libgphoto2 + run vcamera tests
         run: ./scripts/run-vcamera-tests.sh
+
+  # Run Miri (Stacked Borrows) over the pure-unsafe code — callback trampolines,
+  # event-data malloc/free, string marshalling, ABI guards. Tests that call into
+  # libgphoto2 are excluded via cfg(miri), since Miri can't execute FFI.
+  miri:
+    name: miri (unsafe paths)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install libgphoto2 + libclang
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgphoto2-dev pkg-config clang libclang-dev
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: miri
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo miri test --workspace --lib
+
+  # AddressSanitizer over the real C boundary: build libgphoto2 (vusb+ptp2) with
+  # ASan and run the vcamera tests instrumented, catching out-of-bounds / UAF in
+  # our marshalling or in libgphoto2 itself during real capture/config/events.
+  asan:
+    name: asan (vcamera, runtime)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build libltdl-dev pkg-config gettext clang libclang-dev llvm
+          pipx install meson
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rust-src
+      - uses: Swatinem/rust-cache@v2
+      - name: Build ASan libgphoto2 + run vcamera tests under ASan
+        run: ./scripts/run-vcamera-asan.sh
