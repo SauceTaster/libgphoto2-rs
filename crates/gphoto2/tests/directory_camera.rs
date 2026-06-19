@@ -337,6 +337,26 @@ fn recursive_listing_finds_nested_files() {
 }
 
 #[test]
+fn abilities_report_supported_operations() {
+    let _g = lock();
+    let tmp = TempDir::new("ops");
+    let ctx = Context::new().unwrap();
+    let camera = open_directory_camera(&ctx, tmp.path()).expect("open directory camera");
+    let abilities = camera.abilities().unwrap();
+
+    // The directory driver is not a capturing device...
+    assert!(!abilities.camera_operations().capture_image);
+    // ...but it declares delete + EXIF for files and full folder management.
+    let files = abilities.file_operations();
+    assert!(files.delete && files.exif, "{files:?}");
+    let folders = abilities.folder_operations();
+    assert!(
+        folders.make_dir && folders.remove_dir && folders.put_file && !folders.delete_all,
+        "{folders:?}"
+    );
+}
+
+#[test]
 fn opening_unknown_model_is_model_not_found() {
     let _g = lock();
     let ctx = Context::new().unwrap();

@@ -52,7 +52,7 @@ mod list;
 mod port;
 mod util;
 
-pub use abilities::{Abilities, DriverStatus};
+pub use abilities::{Abilities, CameraOperations, DriverStatus, FileOperations, FolderOperations};
 pub use abilities_list::supported_models;
 pub use camera::{Camera, CameraDescriptor, CameraFilePath};
 pub use context::{Context, ProgressHandler};

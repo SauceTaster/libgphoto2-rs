@@ -155,12 +155,11 @@ aspiration — a direction, not a commitment or a schedule.
    `capture_preview` / context callbacks (progress, cancel, message/status/error)
    as Rust closures / **filesystem management (list, typed downloads, file info,
    delete, upload, mkdir/rmdir, delete-all, recursive walk, storage info) +
-   about/manual text**, cross-platform `build.rs`, plus unit tests (the unsafe
-   callback bridging is Miri-checked) and hardware-free virtual-camera
-   integration tests.
-2. **Next** — capability introspection (which operations a model supports),
-   a libgphoto2 logging → `tracing`/`log` bridge, and a thread-safe (`Send`)
-   camera-session story for use from worker/async threads.
+   about/manual text / **capability introspection (per-model operation support)**,
+   cross-platform `build.rs`, plus unit tests (the unsafe callback bridging is
+   Miri-checked) and hardware-free virtual-camera integration tests.
+2. **Next** — a libgphoto2 logging → `tracing`/`log` bridge, and a thread-safe
+   (`Send`) camera-session story for use from worker/async threads.
 
 **Maybe later — pure Rust (aspirational, not started)**
 

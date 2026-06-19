@@ -46,11 +46,96 @@ impl Abilities {
         self.raw.port.0 & sys::GPPortType::GP_PORT_SERIAL.0 != 0
     }
 
+    /// Which remote-control operations this model supports (capture, config, …).
+    pub fn camera_operations(&self) -> CameraOperations {
+        let bits = self.raw.operations.0;
+        let has = |b: sys::CameraOperation| bits & b.0 != 0;
+        CameraOperations {
+            capture_image: has(sys::CameraOperation::GP_OPERATION_CAPTURE_IMAGE),
+            capture_video: has(sys::CameraOperation::GP_OPERATION_CAPTURE_VIDEO),
+            capture_audio: has(sys::CameraOperation::GP_OPERATION_CAPTURE_AUDIO),
+            capture_preview: has(sys::CameraOperation::GP_OPERATION_CAPTURE_PREVIEW),
+            config: has(sys::CameraOperation::GP_OPERATION_CONFIG),
+            trigger_capture: has(sys::CameraOperation::GP_OPERATION_TRIGGER_CAPTURE),
+        }
+    }
+
+    /// Which per-file operations this model supports (delete, raw/exif fetch, …).
+    pub fn file_operations(&self) -> FileOperations {
+        let bits = self.raw.file_operations.0;
+        let has = |b: sys::CameraFileOperation| bits & b.0 != 0;
+        FileOperations {
+            delete: has(sys::CameraFileOperation::GP_FILE_OPERATION_DELETE),
+            preview: has(sys::CameraFileOperation::GP_FILE_OPERATION_PREVIEW),
+            raw: has(sys::CameraFileOperation::GP_FILE_OPERATION_RAW),
+            audio: has(sys::CameraFileOperation::GP_FILE_OPERATION_AUDIO),
+            exif: has(sys::CameraFileOperation::GP_FILE_OPERATION_EXIF),
+        }
+    }
+
+    /// Which folder operations this model supports (upload, mkdir, …).
+    pub fn folder_operations(&self) -> FolderOperations {
+        let bits = self.raw.folder_operations.0;
+        let has = |b: sys::CameraFolderOperation| bits & b.0 != 0;
+        FolderOperations {
+            delete_all: has(sys::CameraFolderOperation::GP_FOLDER_OPERATION_DELETE_ALL),
+            put_file: has(sys::CameraFolderOperation::GP_FOLDER_OPERATION_PUT_FILE),
+            make_dir: has(sys::CameraFolderOperation::GP_FOLDER_OPERATION_MAKE_DIR),
+            remove_dir: has(sys::CameraFolderOperation::GP_FOLDER_OPERATION_REMOVE_DIR),
+        }
+    }
+
     /// Access the underlying raw [`sys::CameraAbilities`] for fields not yet
     /// surfaced by this wrapper.
     pub fn as_raw(&self) -> &sys::CameraAbilities {
         &self.raw
     }
+}
+
+/// Remote-control operations a camera model supports
+/// ([`Abilities::camera_operations`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct CameraOperations {
+    /// Can capture a still image.
+    pub capture_image: bool,
+    /// Can capture video.
+    pub capture_video: bool,
+    /// Can capture audio.
+    pub capture_audio: bool,
+    /// Can produce a liveview preview.
+    pub capture_preview: bool,
+    /// Exposes a configuration tree.
+    pub config: bool,
+    /// Supports trigger-and-wait-for-event capture.
+    pub trigger_capture: bool,
+}
+
+/// Per-file operations a camera model supports ([`Abilities::file_operations`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct FileOperations {
+    /// Files can be deleted.
+    pub delete: bool,
+    /// A preview/thumbnail view is available.
+    pub preview: bool,
+    /// A raw view is available.
+    pub raw: bool,
+    /// An audio view is available.
+    pub audio: bool,
+    /// An EXIF view is available.
+    pub exif: bool,
+}
+
+/// Folder operations a camera model supports ([`Abilities::folder_operations`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct FolderOperations {
+    /// All files in a folder can be deleted at once.
+    pub delete_all: bool,
+    /// Files can be uploaded into a folder.
+    pub put_file: bool,
+    /// Directories can be created.
+    pub make_dir: bool,
+    /// Directories can be removed.
+    pub remove_dir: bool,
 }
 
 impl core::fmt::Debug for Abilities {
@@ -136,5 +221,37 @@ mod tests {
         let usb = Abilities::from_raw(usb_only);
         assert!(usb.supports_usb());
         assert!(!usb.supports_serial());
+    }
+
+    #[test]
+    fn operation_bitmasks_are_decoded() {
+        let mut raw: sys::CameraAbilities = unsafe { core::mem::zeroed() };
+        raw.operations = sys::CameraOperation(
+            sys::CameraOperation::GP_OPERATION_CAPTURE_IMAGE.0
+                | sys::CameraOperation::GP_OPERATION_CONFIG.0,
+        );
+        raw.file_operations = sys::CameraFileOperation::GP_FILE_OPERATION_DELETE;
+        raw.folder_operations = sys::CameraFolderOperation::GP_FOLDER_OPERATION_PUT_FILE;
+
+        let a = Abilities::from_raw(raw);
+
+        let ops = a.camera_operations();
+        assert!(ops.capture_image && ops.config);
+        assert!(!ops.capture_video && !ops.trigger_capture);
+
+        assert_eq!(
+            a.file_operations(),
+            FileOperations {
+                delete: true,
+                ..Default::default()
+            }
+        );
+        assert_eq!(
+            a.folder_operations(),
+            FolderOperations {
+                put_file: true,
+                ..Default::default()
+            }
+        );
     }
 }
