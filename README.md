@@ -1,5 +1,7 @@
 # vibe-libgphoto2-rs
 
+[![CI](https://github.com/SauceTaster/vibe-libgphoto2-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/SauceTaster/vibe-libgphoto2-rs/actions/workflows/ci.yml)
+
 A Rust rewrite of [libgphoto2](https://github.com/gphoto/libgphoto2) — the library
 behind `gphoto2`, digiKam, Darktable tethering, Entangle and friends, which can
 talk to [~2700 camera models](http://www.gphoto.org/proj/libgphoto2/support.php)
@@ -61,7 +63,7 @@ You need libgphoto2 (+ libgphoto2_port) and a C toolchain.
 | macOS           | `brew install libgphoto2 pkgconf`                          |
 | Debian / Ubuntu | `sudo apt install libgphoto2-dev pkg-config clang`         |
 | Fedora          | `sudo dnf install libgphoto2-devel pkgconf-pkg-config clang` |
-| Windows         | See [platform support](#platform-support)                  |
+| Windows (MSYS2) | In a MINGW64 shell: `pacman -S mingw-w64-x86_64-libgphoto2 mingw-w64-x86_64-pkgconf mingw-w64-x86_64-rust` |
 
 ```console
 cargo build
@@ -114,7 +116,8 @@ tests later.
 | -------- | ----- | ----- |
 | Linux    | ✅ supported | `pkg-config` finds the system package. |
 | macOS    | ✅ supported | `build.rs` auto-adds the Homebrew keg's `pkgconfig` dir. Note: capture/control of cameras can require quitting Photos/`PTPCamera`, which claim the USB device. |
-| Windows  | ⚠️ best-effort | libgphoto2 itself is POSIX-centric. The crate compiles everywhere (committed bindings + `docs.rs` handled), and `GPHOTO2_LIB_DIR`/`GPHOTO2_INCLUDE_DIR` let you point at a libgphoto2 built via [MSYS2/Meson](https://github.com/gphoto/libgphoto2). First-class Windows support is a goal of the pure-Rust port (see roadmap). |
+| Windows (MinGW) | ✅ supported | Build with the **GNU toolchain** in [MSYS2](https://www.msys2.org/): install `mingw-w64-x86_64-libgphoto2` and `pkg-config` resolves it normally. Covered by CI. |
+| Windows (MSVC) | ❌ unsupported | libgphoto2 has [no MSVC port](https://github.com/gphoto/libgphoto2/issues/33) and isn't in vcpkg — a libgphoto2 limitation, not this crate's. Use the MinGW path above. |
 | docs.rs  | ✅ | Builds against committed bindings with linking disabled. |
 
 ## Dependency choices (the "be smart for LTS" part)

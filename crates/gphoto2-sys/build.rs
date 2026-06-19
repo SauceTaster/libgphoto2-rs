@@ -67,19 +67,40 @@ fn discover_and_link() -> Vec<PathBuf> {
     let lib = pkg_config::Config::new()
         .atleast_version("2.5")
         .probe("libgphoto2")
-        .unwrap_or_else(|e| {
-            panic!(
-                "Could not find libgphoto2 via pkg-config: {e}\n\
-                 Install it (Debian/Ubuntu: `libgphoto2-dev`, Fedora: `libgphoto2-devel`, \
-                 macOS: `brew install libgphoto2`) or set GPHOTO2_LIB_DIR / GPHOTO2_INCLUDE_DIR."
-            )
-        });
+        .unwrap_or_else(|e| panic!("{}", discovery_error(&e.to_string())));
 
     let mut include_paths = lib.include_paths.clone();
     if let Ok(port) = pkg_config::Config::new().probe("libgphoto2_port") {
         include_paths.extend(port.include_paths);
     }
     include_paths
+}
+
+/// A platform-aware error message when libgphoto2 cannot be located.
+fn discovery_error(detail: &str) -> String {
+    let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
+    let target_env = env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default();
+
+    let mut msg = format!("Could not find libgphoto2 via pkg-config: {detail}\n");
+    if target_os == "windows" {
+        if target_env == "msvc" {
+            msg.push_str(
+                "libgphoto2 has no native MSVC port; build for the GNU toolchain \
+                 (x86_64-pc-windows-gnu) inside MSYS2 instead.\n",
+            );
+        }
+        msg.push_str(
+            "On Windows, use MSYS2/MinGW:\n  \
+             pacman -S mingw-w64-x86_64-libgphoto2 mingw-w64-x86_64-pkgconf\n",
+        );
+    } else {
+        msg.push_str(
+            "Install it (Debian/Ubuntu: `libgphoto2-dev`, Fedora: `libgphoto2-devel`, \
+             macOS: `brew install libgphoto2`).\n",
+        );
+    }
+    msg.push_str("Or set GPHOTO2_LIB_DIR / GPHOTO2_INCLUDE_DIR to point at a custom install.");
+    msg
 }
 
 /// On macOS, prepend the Homebrew libgphoto2 keg's pkgconfig dir to
