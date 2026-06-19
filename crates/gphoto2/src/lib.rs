@@ -53,7 +53,7 @@ mod util;
 pub use abilities::{Abilities, DriverStatus};
 pub use abilities_list::supported_models;
 pub use camera::{Camera, CameraDescriptor, CameraFilePath};
-pub use context::Context;
+pub use context::{Context, ProgressHandler};
 pub use error::{Error, ErrorKind, Result};
 pub use events::CameraEvent;
 pub use file::CameraFile;

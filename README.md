@@ -151,12 +151,13 @@ aspiration — a direction, not a commitment or a schedule.
 
 1. **Done** — `-sys` bindings, safe RAII wrapper, autodetect / open-by-model+port
    / abilities / folder+file listing / capture / download / `supported_models` /
-   config (widget) tree / **events (`wait_for_event`) + tethered `trigger_capture`
-   + liveview `capture_preview`**, cross-platform `build.rs`, plus unit tests and
-   hardware-free virtual-camera integration tests.
-2. **Next** — file operations (delete, upload, get info), storage info,
-   recursive listing helpers, and context callbacks (progress/cancel/status)
-   bridged to Rust closures.
+   config (widget) tree / events (`wait_for_event`) + tethered `trigger_capture`
+   + liveview `capture_preview` / **context callbacks (progress, cancel,
+   message/status/error) as Rust closures**, cross-platform `build.rs`, plus unit
+   tests (the unsafe callback bridging is Miri-checked) and hardware-free
+   virtual-camera integration tests.
+2. **Next** — file operations (delete, upload, get info), richer file-type
+   downloads (RAW/EXIF/preview), storage info, and recursive listing helpers.
 
 **Maybe later — pure Rust (aspirational, not started)**
 

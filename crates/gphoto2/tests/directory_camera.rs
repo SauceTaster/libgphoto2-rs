@@ -7,12 +7,14 @@
 //! Requires the `directory` camlib and `disk` iolib, which ship with a normal
 //! libgphoto2 install. If they're absent the first test reports that clearly.
 
+use std::cell::{Cell, RefCell};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use gphoto2::{supported_models, Camera, CameraFilePath, Context, ErrorKind};
+use gphoto2::{supported_models, Camera, CameraFilePath, Context, ErrorKind, ProgressHandler};
 
 /// libgphoto2 loads drivers via global ltdl/dlopen state; serialise the tests
 /// that spin up cameras so parallel runs can't race on it.
@@ -138,6 +140,79 @@ fn wait_for_event_is_unsupported_on_directory_camera() {
         Err(e) => assert_eq!(e.kind(), gphoto2::ErrorKind::NotSupported),
         Ok(other) => panic!("expected NotSupported, got {other:?}"),
     }
+}
+
+#[test]
+fn cancel_handler_aborts_a_listing() {
+    let _g = lock();
+    let tmp = TempDir::new("cancel");
+    fs::write(tmp.path().join("a.jpg"), b"a").unwrap();
+    fs::write(tmp.path().join("b.jpg"), b"b").unwrap();
+
+    let mut ctx = Context::new().unwrap();
+    // Open first — a cancel handler that always fires would otherwise abort init.
+    let camera = open_directory_camera(&ctx, tmp.path()).expect("open directory camera");
+
+    let polls = Rc::new(Cell::new(0u32));
+    {
+        let polls = polls.clone();
+        ctx.set_cancel_handler(move || {
+            polls.set(polls.get() + 1);
+            true
+        });
+    }
+
+    // The directory driver polls cancel while listing; returning true aborts it.
+    match camera.list_files(&ctx, "/") {
+        Err(e) => assert_eq!(e.kind(), ErrorKind::Cancel),
+        Ok(files) => panic!("expected cancellation, got {files:?}"),
+    }
+    assert!(polls.get() >= 1, "cancel handler should have been polled");
+}
+
+#[derive(Default)]
+struct ProgressLog {
+    started: bool,
+    updates: u32,
+    stopped: bool,
+}
+
+struct RecordingProgress {
+    log: Rc<RefCell<ProgressLog>>,
+}
+
+impl ProgressHandler for RecordingProgress {
+    fn start(&mut self, _target: f32, _message: &str) -> u32 {
+        self.log.borrow_mut().started = true;
+        1
+    }
+    fn update(&mut self, _id: u32, _current: f32) {
+        self.log.borrow_mut().updates += 1;
+    }
+    fn stop(&mut self, _id: u32) {
+        self.log.borrow_mut().stopped = true;
+    }
+}
+
+#[test]
+fn progress_handler_observes_a_listing() {
+    let _g = lock();
+    let tmp = TempDir::new("progress");
+    for i in 0..3 {
+        fs::write(tmp.path().join(format!("f{i}.jpg")), b"x").unwrap();
+    }
+
+    let mut ctx = Context::new().unwrap();
+    let camera = open_directory_camera(&ctx, tmp.path()).expect("open directory camera");
+
+    let log = Rc::new(RefCell::new(ProgressLog::default()));
+    ctx.set_progress_handler(RecordingProgress { log: log.clone() });
+
+    let _ = camera.list_files(&ctx, "/").unwrap();
+
+    let log = log.borrow();
+    assert!(log.started, "progress start should have fired");
+    assert!(log.stopped, "progress stop should have fired");
 }
 
 #[test]

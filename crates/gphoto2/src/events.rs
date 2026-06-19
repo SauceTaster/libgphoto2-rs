@@ -15,9 +15,11 @@ use crate::camera::CameraFilePath;
 use crate::util::{cstr_to_string, fixed_buf_to_string};
 
 // libgphoto2 mallocs the event payload and documents that the caller frees it.
-// We bind libc `free` directly rather than pull in the `libc` crate; it resolves
-// to the same allocator libgphoto2 used (single system/CRT libc on every
-// supported platform).
+// We bind libc `free` directly rather than pull in the `libc` crate. This is
+// sound only when this binary and libgphoto2 share one C allocator, which holds
+// on every supported configuration: a single system libc on Linux/macOS, and on
+// Windows the MSYS2/MINGW64 toolchain where the camlib DLLs and this crate link
+// the same MinGW CRT. (Mixing a foreign-CRT libgphoto2 would be a heap mismatch.)
 extern "C" {
     fn free(ptr: *mut c_void);
 }
