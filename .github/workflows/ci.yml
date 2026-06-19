@@ -92,3 +92,22 @@ jobs:
         run: cargo build --workspace --all-targets --no-default-features
       - name: Unit tests
         run: cargo test --workspace --lib --no-default-features
+
+  # Build libgphoto2 from the vendored source with its virtual PTP camera
+  # (--enable-vusb + ptp2) and run the vcamera tests against it. This is the only
+  # way to cover capture / config tree / events without real hardware.
+  vcamera:
+    name: vcamera (virtual PTP)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y meson ninja-build libltdl-dev pkg-config gettext clang libclang-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build vusb libgphoto2 + run vcamera tests
+        run: ./scripts/run-vcamera-tests.sh

@@ -112,9 +112,17 @@ cargo test                       # everything, no camera needed
 cargo test --no-default-features # same, against the committed bindings
 ```
 
-The vcamera (vusb/PTP) path used by some other wrappers needs a custom
-`--enable-vusb` build of libgphoto2; it's a candidate for richer capture/config
-tests later.
+- **Virtual PTP camera (vcamera)** — for the paths the directory camera can't
+  reach (capture, the config widget tree, events), `tests/vcamera.rs` drives
+  libgphoto2's built-in **virtual PTP camera** (the `vusb` driver + `ptp2`
+  camlib). It needs a libgphoto2 built with `--enable-vusb`, so it's gated behind
+  `GPHOTO2_VUSB_TESTS` and skips otherwise. One command builds that libgphoto2
+  from the vendored source and runs the suite (also a CI lane):
+
+  ```console
+  git submodule update --init        # vendor/libgphoto2
+  ./scripts/run-vcamera-tests.sh     # needs meson + ninja + libltdl
+  ```
 
 ## Platform support
 
@@ -160,10 +168,10 @@ aspiration — a direction, not a commitment or a schedule.
    libgphoto2 logging → `log` bridge (`log` feature) / **`CameraThread`: a
    `Send + Sync` session pinned to its own thread**, cross-platform `build.rs`,
    plus unit tests (the unsafe callback bridging is Miri-checked) and hardware-free
-   virtual-camera integration tests.
-2. **Next** — partial/range reads (`gp_camera_file_read`), a vcamera CI lane for
-   real capture/config coverage, and publish prep (final crate name, CHANGELOG,
-   MSRV job).
+   integration tests against **both** the directory camera and the **virtual PTP
+   camera (vcamera)** — the latter covering real capture / config / events.
+2. **Next** — partial/range reads (`gp_camera_file_read`) and publish prep (final
+   crate name, CHANGELOG, MSRV job).
 
 **Maybe later — pure Rust (aspirational, not started)**
 
