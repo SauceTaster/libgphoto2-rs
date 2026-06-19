@@ -125,6 +125,22 @@ fn list_files_in_subfolder() {
 }
 
 #[test]
+fn wait_for_event_is_unsupported_on_directory_camera() {
+    let _g = lock();
+    let tmp = TempDir::new("events");
+    let ctx = Context::new().unwrap();
+    let camera = open_directory_camera(&ctx, tmp.path()).expect("open directory camera");
+
+    // The directory driver has no event source, so the core returns
+    // GP_ERROR_NOT_SUPPORTED — a deterministic exercise of the wait_for_event
+    // FFI path and error mapping on a real camera handle.
+    match camera.wait_for_event(&ctx, std::time::Duration::from_millis(10)) {
+        Err(e) => assert_eq!(e.kind(), gphoto2::ErrorKind::NotSupported),
+        Ok(other) => panic!("expected NotSupported, got {other:?}"),
+    }
+}
+
+#[test]
 fn opening_unknown_model_is_model_not_found() {
     let _g = lock();
     let ctx = Context::new().unwrap();

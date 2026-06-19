@@ -31,3 +31,7 @@ path = "examples/detect.rs"
 [[example]]
 name = "config"
 path = "examples/config.rs"
+
+[[example]]
+name = "tether"
+path = "examples/tether.rs"

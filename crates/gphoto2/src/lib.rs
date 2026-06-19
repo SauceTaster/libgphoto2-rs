@@ -40,6 +40,7 @@ pub mod abilities;
 pub mod camera;
 pub mod context;
 pub mod error;
+pub mod events;
 pub mod file;
 pub mod version;
 pub mod widget;
@@ -54,6 +55,7 @@ pub use abilities_list::supported_models;
 pub use camera::{Camera, CameraDescriptor, CameraFilePath};
 pub use context::Context;
 pub use error::{Error, ErrorKind, Result};
+pub use events::CameraEvent;
 pub use file::CameraFile;
 pub use version::{library_version, library_version_verbose};
 pub use widget::{Widget, WidgetType, WidgetValue};
@@ -61,7 +63,7 @@ pub use widget::{Widget, WidgetType, WidgetValue};
 /// Common imports for everyday use: `use gphoto2::prelude::*;`.
 pub mod prelude {
     pub use crate::{
-        Abilities, Camera, CameraDescriptor, CameraFile, CameraFilePath, Context, Error, ErrorKind,
-        Result, Widget, WidgetType, WidgetValue,
+        Abilities, Camera, CameraDescriptor, CameraEvent, CameraFile, CameraFilePath, Context,
+        Error, ErrorKind, Result, Widget, WidgetType, WidgetValue,
     };
 }

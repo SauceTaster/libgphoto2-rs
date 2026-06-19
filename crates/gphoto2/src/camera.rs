@@ -1,7 +1,9 @@
 //! The [`Camera`] — a connected camera you can detect, capture from, and
 //! download files from.
 
+use core::ffi::{c_int, c_void};
 use std::ffi::CString;
+use std::time::Duration;
 
 use gphoto2_sys as sys;
 
@@ -9,6 +11,7 @@ use crate::abilities::Abilities;
 use crate::abilities_list::AbilitiesList;
 use crate::context::Context;
 use crate::error::{check, Error, Result};
+use crate::events::{interpret_event, CameraEvent};
 use crate::file::CameraFile;
 use crate::list::List;
 use crate::port::PortInfoList;
@@ -143,6 +146,51 @@ impl Camera {
             folder: fixed_buf_to_string(&path.folder),
             name: fixed_buf_to_string(&path.name),
         })
+    }
+
+    /// Trigger a capture but return immediately, without waiting for the file.
+    ///
+    /// Pair with [`Camera::wait_for_event`] to learn when the resulting file is
+    /// ready (the tethered-shooting flow). For a simple blocking capture, use
+    /// [`Camera::capture_image`] instead.
+    pub fn trigger_capture(&self, context: &Context) -> Result<()> {
+        check(unsafe { sys::gp_camera_trigger_capture(self.inner, context.as_ptr()) })?;
+        Ok(())
+    }
+
+    /// Capture a viewfinder preview frame (liveview) into an in-memory file.
+    ///
+    /// Returns a small, fast preview — not a full-resolution capture. Call
+    /// repeatedly to stream liveview.
+    pub fn capture_preview(&self, context: &Context) -> Result<CameraFile> {
+        let file = CameraFile::new()?;
+        check(unsafe {
+            sys::gp_camera_capture_preview(self.inner, file.as_ptr(), context.as_ptr())
+        })?;
+        Ok(file)
+    }
+
+    /// Wait up to `timeout` for the next camera event.
+    ///
+    /// Returns [`CameraEvent::Timeout`] if nothing happens in time, or
+    /// [`ErrorKind::NotSupported`](crate::ErrorKind::NotSupported) for drivers
+    /// with no event source.
+    pub fn wait_for_event(&self, context: &Context, timeout: Duration) -> Result<CameraEvent> {
+        let ms = timeout.as_millis().min(c_int::MAX as u128) as c_int;
+        let mut event_type = sys::CameraEventType(0);
+        let mut data: *mut c_void = core::ptr::null_mut();
+        check(unsafe {
+            sys::gp_camera_wait_for_event(
+                self.inner,
+                ms,
+                &mut event_type,
+                &mut data,
+                context.as_ptr(),
+            )
+        })?;
+        // SAFETY: on success libgphoto2 set `event_type` and, for some events,
+        // malloc'd `data` to match it; `interpret_event` owns and frees `data`.
+        Ok(unsafe { interpret_event(event_type, data) })
     }
 
     /// Download the normal (full-resolution) view of a file from the camera.
