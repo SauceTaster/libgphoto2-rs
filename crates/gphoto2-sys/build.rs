@@ -50,11 +50,20 @@ fn discover_and_link() -> Vec<PathBuf> {
         println!("cargo:rustc-link-lib=gphoto2");
         println!("cargo:rustc-link-lib=gphoto2_port");
 
-        let mut includes = Vec::new();
-        if let Some(inc) = env::var_os("GPHOTO2_INCLUDE_DIR") {
-            includes.push(PathBuf::from(inc));
+        match env::var_os("GPHOTO2_INCLUDE_DIR") {
+            Some(inc) => return vec![PathBuf::from(inc)],
+            // With the default build-time bindgen, bindgen needs the headers; an
+            // empty include list would fail later with a bare "gphoto2.h not
+            // found". Fail now with guidance.
+            None if cfg!(feature = "buildtime-bindgen") => panic!(
+                "GPHOTO2_LIB_DIR is set but GPHOTO2_INCLUDE_DIR is not, so bindgen \
+                 has no headers to parse. Set GPHOTO2_INCLUDE_DIR to the dir \
+                 containing `gphoto2/gphoto2.h`, or build with \
+                 `--no-default-features` to use the committed bindings."
+            ),
+            // Committed-bindings build doesn't run bindgen; no headers needed.
+            None => return Vec::new(),
         }
-        return includes;
     }
 
     // 2. pkg-config.

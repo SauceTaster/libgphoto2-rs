@@ -729,8 +729,17 @@ unsafe extern "C" {
     pub fn gp_port_result_as_string(result: ::std::os::raw::c_int)
         -> *const ::std::os::raw::c_char;
 }
-pub type __darwin_time_t = ::std::os::raw::c_long;
-pub type time_t = __darwin_time_t;
+// MANUAL FIX (not from bindgen): these committed bindings were generated on
+// macOS, where bindgen resolves `time_t` to `c_long`. That is 64-bit on LP64
+// (Linux/macOS) but only 32-bit on x86_64-pc-windows-gnu (LLP64), whereas
+// MinGW-w64's real `time_t` is `__time64_t` (64-bit). Hardcoding `c_long` here
+// would make `CameraFileInfo`/`gp_file_get_mtime` 4 bytes too short on Windows
+// and let libgphoto2 write out of bounds. Pick the right width per target.
+// (The build-time-bindgen path regenerates `time_t` per target and is unaffected.)
+#[cfg(windows)]
+pub type time_t = i64;
+#[cfg(not(windows))]
+pub type time_t = ::std::os::raw::c_long;
 impl CameraFileType {
     #[doc = "< A preview of an image."]
     pub const GP_FILE_TYPE_PREVIEW: CameraFileType = CameraFileType(0);

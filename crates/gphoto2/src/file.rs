@@ -106,7 +106,8 @@ impl CameraFile {
     }
 
     /// The file's modification time (seconds since the Unix epoch); `0` if unset.
-    // `mtime as i64`: time_t is i64 on Linux/macOS but i32 on Windows.
+    // `as i64`: normalize libgphoto2's `time_t` (a 64-bit `c_long` on Unix, `i64`
+    // on Windows) to a fixed width — a no-op on every 64-bit target.
     #[allow(clippy::unnecessary_cast)]
     pub fn mtime(&self) -> Result<i64> {
         let mut mtime: sys::time_t = 0;

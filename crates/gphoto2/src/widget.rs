@@ -169,8 +169,27 @@ impl Widget {
         })
     }
 
-    /// Set this widget's value. The variant must match the widget's type.
+    /// Set this widget's value. The variant must match the widget's type;
+    /// a mismatch returns [`ErrorKind::BadParameters`](crate::ErrorKind::BadParameters).
     pub fn set_value(&self, value: &WidgetValue) -> Result<()> {
+        // libgphoto2 reinterprets the pointer based on the widget's *type*
+        // (string widgets `strdup` it, range reads `*float`, toggle/date read
+        // `*int`). A mismatched variant would make it read the wrong shape — e.g.
+        // `strdup` past a 4-byte `&f32` — so reject mismatches before the FFI
+        // call, making the unsafe casts below sound by construction.
+        let ty = self.widget_type()?;
+        let compatible = matches!(
+            (ty, value),
+            (
+                WidgetType::Text | WidgetType::Radio | WidgetType::Menu,
+                WidgetValue::Text(_) | WidgetValue::Choice(_),
+            ) | (WidgetType::Range, WidgetValue::Range(_))
+                | (WidgetType::Toggle, WidgetValue::Toggle(_))
+                | (WidgetType::Date, WidgetValue::Date(_))
+        );
+        if !compatible {
+            return Err(Error::new(sys::GP_ERROR_BAD_PARAMETERS));
+        }
         match value {
             WidgetValue::Text(s) | WidgetValue::Choice(s) => {
                 let c = to_cstring(s)?;
@@ -410,10 +429,67 @@ mod tests {
     }
 
     #[test]
-    fn setting_a_type_mismatch_is_rejected() {
+    fn set_value_rejects_type_mismatches() {
         let root = sample_tree();
-        // The root window holds no value.
+        let owner = root.get_child("owner").unwrap(); // Text
+        let iso = root.get_child("iso").unwrap(); // Radio
+        let flag = root.get_child("flag").unwrap(); // Toggle
+
+        // Cross-category mismatches are rejected (pre-fix, a numeric variant on a
+        // string widget made libgphoto2 strdup past a 4-byte value: OOB read).
+        assert!(owner.set_value(&WidgetValue::Range(1.0)).is_err());
+        assert!(owner.set_value(&WidgetValue::Toggle(true)).is_err());
+        assert!(iso.set_value(&WidgetValue::Range(1.0)).is_err());
+        assert!(flag.set_value(&WidgetValue::Text("x".into())).is_err());
+        assert!(flag.set_value(&WidgetValue::Date(1)).is_err());
+
+        // Containers / buttons / None hold no value.
         assert!(root.set_value(&WidgetValue::None).is_err());
+        assert!(root.set_value(&WidgetValue::Text("x".into())).is_err());
+
+        // Rejected sets leave the value untouched.
+        assert_eq!(owner.value().unwrap(), WidgetValue::Text("Ansel".into()));
+        assert_eq!(iso.value().unwrap(), WidgetValue::Choice("200".into()));
+        assert_eq!(flag.value().unwrap(), WidgetValue::Toggle(true));
+
+        // Matching variants still work (Text/Choice interchangeable on strings).
+        assert!(owner.set_value(&WidgetValue::Text("ok".into())).is_ok());
+        assert!(iso.set_value(&WidgetValue::Choice("400".into())).is_ok());
+        assert!(flag.set_value(&WidgetValue::Toggle(false)).is_ok());
+    }
+
+    #[test]
+    fn range_and_date_round_trip() {
+        // sample_tree covers Text/Choice/Toggle; cover Range and Date here.
+        unsafe {
+            let mut range: *mut sys::CameraWidget = core::ptr::null_mut();
+            let label = CString::new("Zoom").unwrap();
+            assert!(
+                sys::gp_widget_new(
+                    sys::CameraWidgetType::GP_WIDGET_RANGE,
+                    label.as_ptr(),
+                    &mut range
+                ) >= 0
+            );
+            assert!(sys::gp_widget_set_range(range, 0.0, 10.0, 0.5) >= 0);
+            let range = Widget::from_root(range);
+            range.set_range(3.5).unwrap();
+            assert_eq!(range.value().unwrap(), WidgetValue::Range(3.5));
+            assert_eq!(range.range().unwrap(), (0.0, 10.0, 0.5));
+
+            let mut date: *mut sys::CameraWidget = core::ptr::null_mut();
+            let label = CString::new("Date & Time").unwrap();
+            assert!(
+                sys::gp_widget_new(
+                    sys::CameraWidgetType::GP_WIDGET_DATE,
+                    label.as_ptr(),
+                    &mut date
+                ) >= 0
+            );
+            let date = Widget::from_root(date);
+            date.set_value(&WidgetValue::Date(1_700_000_000)).unwrap();
+            assert_eq!(date.value().unwrap(), WidgetValue::Date(1_700_000_000));
+        }
     }
 
     #[test]

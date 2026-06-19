@@ -36,8 +36,8 @@ pub struct FileInfo {
 }
 
 impl FileInfo {
-    // `mtime as i64`: time_t is i64 on Linux/macOS but i32 on Windows, so the
-    // cast is needed there and a no-op here.
+    // `as i64`: normalize libgphoto2's `time_t` (a 64-bit `c_long` on Unix, `i64`
+    // on Windows) to a fixed width — a no-op on every 64-bit target.
     #[allow(clippy::unnecessary_cast)]
     pub(crate) fn from_raw(info: &sys::CameraFileInfo) -> Self {
         let f = &info.file;
