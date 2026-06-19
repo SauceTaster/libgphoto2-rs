@@ -20,9 +20,12 @@ authors.workspace = true
 # use the committed pregenerated bindings (`--no-default-features`).
 default = ["buildtime-bindgen"]
 buildtime-bindgen = ["gphoto2-sys/buildtime-bindgen"]
+# Bridge libgphoto2's internal logging to the `log` crate (see `log_bridge`).
+log = ["dep:log"]
 
 [dependencies]
 gphoto2-sys = { workspace = true, default-features = false }
+log = { version = "0.4", optional = true }
 
 [[example]]
 name = "detect"

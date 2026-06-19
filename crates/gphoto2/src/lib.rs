@@ -43,6 +43,8 @@ pub mod error;
 pub mod events;
 pub mod file;
 pub mod info;
+#[cfg(feature = "log")]
+pub mod log_bridge;
 pub mod storage;
 pub mod version;
 pub mod widget;
@@ -60,6 +62,8 @@ pub use error::{Error, ErrorKind, Result};
 pub use events::CameraEvent;
 pub use file::{CameraFile, FileType};
 pub use info::{FileInfo, FilePermissions};
+#[cfg(feature = "log")]
+pub use log_bridge::{forward_to_log, LogHandler, LogLevel};
 pub use storage::{AccessType, FilesystemType, StorageInfo, StorageType};
 pub use version::{library_version, library_version_verbose};
 pub use widget::{Widget, WidgetType, WidgetValue};

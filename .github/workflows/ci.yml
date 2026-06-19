@@ -56,6 +56,8 @@ jobs:
         run: cargo build --workspace --all-targets
       - name: Test
         run: cargo test --workspace --all-targets
+      - name: Test (log feature)
+        run: cargo test -p gphoto2 --features log
       - name: Doc tests
         run: cargo test --workspace --doc
       - name: Verify committed-bindings path also builds

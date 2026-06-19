@@ -80,6 +80,7 @@ name = "gphoto2"
 version = "0.1.0"
 dependencies = [
  "gphoto2-sys",
+ "log",
 ]
 
 [[package]]

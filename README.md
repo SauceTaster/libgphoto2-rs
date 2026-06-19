@@ -89,6 +89,7 @@ cargo build --no-default-features    # uses src/bindings_pregenerated.rs
 | --------------------------------- | ------------------------------------------------------------ |
 | feature `buildtime-bindgen` (default) | Regenerate bindings via `bindgen` against installed headers |
 | `--no-default-features`           | Use committed `bindings_pregenerated.rs` (no `libclang`)      |
+| feature `log`                     | Bridge libgphoto2's logging to the [`log`](https://crates.io/crates/log) crate (see `log_bridge`) |
 | env `GPHOTO2_LIB_DIR`             | Link dir override when `pkg-config` is absent (e.g. Windows)  |
 | env `GPHOTO2_INCLUDE_DIR`         | Header dir override for bindgen                               |
 | env `PKG_CONFIG_PATH`             | Standard pkg-config search path                               |
@@ -155,11 +156,12 @@ aspiration — a direction, not a commitment or a schedule.
    `capture_preview` / context callbacks (progress, cancel, message/status/error)
    as Rust closures / **filesystem management (list, typed downloads, file info,
    delete, upload, mkdir/rmdir, delete-all, recursive walk, storage info) +
-   about/manual text / **capability introspection (per-model operation support)**,
-   cross-platform `build.rs`, plus unit tests (the unsafe callback bridging is
-   Miri-checked) and hardware-free virtual-camera integration tests.
-2. **Next** — a libgphoto2 logging → `tracing`/`log` bridge, and a thread-safe
-   (`Send`) camera-session story for use from worker/async threads.
+   about/manual text / capability introspection (per-model operation support) /
+   **libgphoto2 logging → `log` bridge (`log` feature)**, cross-platform
+   `build.rs`, plus unit tests (the unsafe callback bridging is Miri-checked) and
+   hardware-free virtual-camera integration tests.
+2. **Next** — a thread-safe (`Send`) camera-session story for use from
+   worker/async threads (libgphoto2 itself is single-threaded per camera).
 
 **Maybe later — pure Rust (aspirational, not started)**
 
