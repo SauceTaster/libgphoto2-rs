@@ -46,6 +46,7 @@ pub mod info;
 #[cfg(feature = "log")]
 pub mod log_bridge;
 pub mod storage;
+pub mod thread;
 pub mod version;
 pub mod widget;
 
@@ -65,13 +66,15 @@ pub use info::{FileInfo, FilePermissions};
 #[cfg(feature = "log")]
 pub use log_bridge::{forward_to_log, LogHandler, LogLevel};
 pub use storage::{AccessType, FilesystemType, StorageInfo, StorageType};
+pub use thread::CameraThread;
 pub use version::{library_version, library_version_verbose};
 pub use widget::{Widget, WidgetType, WidgetValue};
 
 /// Common imports for everyday use: `use gphoto2::prelude::*;`.
 pub mod prelude {
     pub use crate::{
-        Abilities, Camera, CameraDescriptor, CameraEvent, CameraFile, CameraFilePath, Context,
-        Error, ErrorKind, FileInfo, FileType, Result, StorageInfo, Widget, WidgetType, WidgetValue,
+        Abilities, Camera, CameraDescriptor, CameraEvent, CameraFile, CameraFilePath, CameraThread,
+        Context, Error, ErrorKind, FileInfo, FileType, Result, StorageInfo, Widget, WidgetType,
+        WidgetValue,
     };
 }

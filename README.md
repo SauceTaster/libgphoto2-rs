@@ -157,11 +157,13 @@ aspiration — a direction, not a commitment or a schedule.
    as Rust closures / **filesystem management (list, typed downloads, file info,
    delete, upload, mkdir/rmdir, delete-all, recursive walk, storage info) +
    about/manual text / capability introspection (per-model operation support) /
-   **libgphoto2 logging → `log` bridge (`log` feature)**, cross-platform
-   `build.rs`, plus unit tests (the unsafe callback bridging is Miri-checked) and
-   hardware-free virtual-camera integration tests.
-2. **Next** — a thread-safe (`Send`) camera-session story for use from
-   worker/async threads (libgphoto2 itself is single-threaded per camera).
+   libgphoto2 logging → `log` bridge (`log` feature) / **`CameraThread`: a
+   `Send + Sync` session pinned to its own thread**, cross-platform `build.rs`,
+   plus unit tests (the unsafe callback bridging is Miri-checked) and hardware-free
+   virtual-camera integration tests.
+2. **Next** — partial/range reads (`gp_camera_file_read`), a vcamera CI lane for
+   real capture/config coverage, and publish prep (final crate name, CHANGELOG,
+   MSRV job).
 
 **Maybe later — pure Rust (aspirational, not started)**
 

@@ -357,6 +357,54 @@ fn abilities_report_supported_operations() {
 }
 
 #[test]
+fn camera_thread_drives_a_session_off_thread() {
+    let _g = lock();
+    let tmp = TempDir::new("thread");
+    fs::write(tmp.path().join("x.jpg"), b"hello").unwrap();
+    let dir = tmp.path().to_path_buf();
+
+    let cam = gphoto2::CameraThread::spawn(move || {
+        let ctx = Context::new()?;
+        let camera = Camera::open(&ctx, "Directory Browse", &format!("disk:{}", dir.display()))?;
+        Ok((ctx, camera))
+    })
+    .expect("spawn camera thread");
+
+    // A listing runs on the camera's thread; the (Send) Vec comes back.
+    let files = cam
+        .run(|camera, ctx| camera.list_files(ctx, "/"))
+        .unwrap()
+        .unwrap();
+    assert!(files.iter().any(|f| f == "x.jpg"), "{files:?}");
+
+    // Non-Send CameraFile is consumed inside the closure; owned bytes escape.
+    let bytes = cam
+        .run(|camera, ctx| {
+            let path = CameraFilePath {
+                folder: "/".into(),
+                name: "x.jpg".into(),
+            };
+            camera
+                .download(ctx, &path)
+                .and_then(|f| f.data().map(<[u8]>::to_vec))
+        })
+        .unwrap()
+        .unwrap();
+    assert_eq!(bytes, b"hello");
+
+    // The handle is Send: move it to another thread and use it there.
+    let count = std::thread::spawn(move || {
+        cam.run(|camera, ctx| camera.list_files(ctx, "/"))
+            .unwrap()
+            .unwrap()
+            .len()
+    })
+    .join()
+    .unwrap();
+    assert!(count >= 1);
+}
+
+#[test]
 fn opening_unknown_model_is_model_not_found() {
     let _g = lock();
     let ctx = Context::new().unwrap();
