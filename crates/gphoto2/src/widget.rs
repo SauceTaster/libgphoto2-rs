@@ -332,6 +332,8 @@ mod tests {
     /// Build a small config tree by hand via the C API, then wrap it. This
     /// exercises the whole widget wrapper without needing a camera.
     fn sample_tree() -> Widget {
+        #[cfg(feature = "log")]
+        crate::log_bridge::initialize().unwrap();
         unsafe {
             let new = |ty: sys::CameraWidgetType, label: &str| -> *mut sys::CameraWidget {
                 let mut w: *mut sys::CameraWidget = core::ptr::null_mut();
@@ -462,6 +464,8 @@ mod tests {
 
     #[test]
     fn range_and_date_round_trip() {
+        #[cfg(feature = "log")]
+        crate::log_bridge::initialize().unwrap();
         // sample_tree covers Text/Choice/Toggle; cover Range and Date here.
         unsafe {
             let mut range: *mut sys::CameraWidget = core::ptr::null_mut();
