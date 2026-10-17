@@ -1,5 +1,5 @@
 [package]
-name = "gphoto2-sys"
+name = "gphoto2-bindings-sys"
 version = "0.1.0"
 description = "Raw FFI bindings to the libgphoto2 C library (libgphoto2 + libgphoto2_port)"
 keywords = ["gphoto2", "camera", "ptp", "ffi", "bindings"]
@@ -14,6 +14,11 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
+
+# The package name is distinct from other crates; existing Rust imports stay
+# `gphoto2_sys` so downstream Git users can migrate with a dependency alias.
+[lib]
+name = "gphoto2_sys"
 
 [features]
 # Default: regenerate bindings at build time so they always match the installed

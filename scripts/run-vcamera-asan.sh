@@ -62,4 +62,4 @@ cd "$root"
 # (so bindgen isn't instrumented); -Zbuild-std instruments std too.
 RUSTFLAGS="-Zsanitizer=address" \
   cargo +nightly test -Zbuild-std --target "$host" \
-  -p gphoto2 --test vcamera -- --test-threads=1
+  -p gphoto2-bindings --features log --lib --test vcamera --test logging -- --test-threads=1

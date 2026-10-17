@@ -53,6 +53,8 @@ pub struct CameraFile {
 impl CameraFile {
     /// Allocate a new, empty file object.
     pub fn new() -> Result<Self> {
+        #[cfg(feature = "log")]
+        crate::log_bridge::initialize()?;
         let mut inner: *mut sys::CameraFile = core::ptr::null_mut();
         check(unsafe { sys::gp_file_new(&mut inner) })?;
         if inner.is_null() {

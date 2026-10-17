@@ -1,7 +1,7 @@
 //! Print the configuration tree of the attached camera, and demonstrate
 //! reading a single setting.
 //!
-//! Run with: `cargo run -p gphoto2 --example config`
+//! Run with: `cargo run -p gphoto2-bindings --example config`
 
 use gphoto2::widget::{Widget, WidgetType};
 use gphoto2::{Camera, Context};

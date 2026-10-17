@@ -74,6 +74,8 @@ pub struct Context {
 impl Context {
     /// Create a new context with no callbacks attached.
     pub fn new() -> Result<Self> {
+        #[cfg(feature = "log")]
+        crate::log_bridge::initialize()?;
         // SAFETY: no preconditions; returns null only on allocation failure.
         let inner = unsafe { sys::gp_context_new() };
         if inner.is_null() {

@@ -1,14 +1,14 @@
-# vibe-libgphoto2-rs
+# libgphoto2-rs
 
-[![CI](https://github.com/SauceTaster/vibe-libgphoto2-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/SauceTaster/vibe-libgphoto2-rs/actions/workflows/ci.yml)
+[![CI](https://github.com/SauceTaster/libgphoto2-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/SauceTaster/libgphoto2-rs/actions/workflows/ci.yml)
 
 **Safe Rust bindings to [libgphoto2](https://github.com/gphoto/libgphoto2)** — the
 C library behind `gphoto2`, digiKam, Darktable tethering, Entangle and friends,
 which talks to [~2700 camera models](http://www.gphoto.org/proj/libgphoto2/support.php)
 over USB, PTP/MTP, serial and IP.
 
-**What this is today:** a raw FFI crate (`gphoto2-sys`) and a safe, idiomatic
-wrapper (`gphoto2`) that link and call into the existing C library. It does
+**What this is today:** a raw FFI crate (`gphoto2-bindings-sys`) and a safe, idiomatic
+wrapper (`gphoto2-bindings`) that link and call into the existing C library. It does
 **not** reimplement libgphoto2 in Rust — it *binds* it. If you want to talk to a
 camera from Rust today, that's exactly what this provides.
 
@@ -39,6 +39,19 @@ through to the C library.
 
 ## Quick start
 
+Requires Rust **1.82 or newer** and a separately installed libgphoto2. The
+crates.io package names are `gphoto2-bindings` (safe wrapper) and
+`gphoto2-bindings-sys` (raw FFI). They are separate from the existing `gphoto2`,
+`gphoto2-sys`, and `libgphoto2_sys` projects. The Rust library names remain
+`gphoto2` and `gphoto2_sys` for compatibility with existing Git users.
+
+For the prepared 0.1.0 release:
+
+```toml
+[dependencies]
+gphoto2 = { package = "gphoto2-bindings", version = "0.1" }
+```
+
 ```rust
 use gphoto2::{Camera, Context};
 
@@ -56,7 +69,7 @@ file.save(&path.name)?;
 ```
 
 ```console
-$ cargo run -p gphoto2 --example detect
+$ cargo run -p gphoto2-bindings --example detect
 ```
 
 ## Building
@@ -68,14 +81,14 @@ You need libgphoto2 (+ libgphoto2_port) and a C toolchain.
 | macOS           | `brew install libgphoto2 pkgconf`                          |
 | Debian / Ubuntu | `sudo apt install libgphoto2-dev pkg-config clang`         |
 | Fedora          | `sudo dnf install libgphoto2-devel pkgconf-pkg-config clang` |
-| Windows (MSYS2) | In a MINGW64 shell: `pacman -S mingw-w64-x86_64-libgphoto2 mingw-w64-x86_64-pkgconf mingw-w64-x86_64-rust` |
+| Windows (MSYS2) | In a **UCRT64** shell: `pacman -S mingw-w64-ucrt-x86_64-libgphoto2 mingw-w64-ucrt-x86_64-pkgconf mingw-w64-ucrt-x86_64-rust` |
 
 ```console
 cargo build
 cargo test          # smoke tests run without a camera attached
 ```
 
-By default `gphoto2-sys` regenerates its bindings with `bindgen` at build time
+By default `gphoto2-bindings-sys` regenerates its bindings with `bindgen` at build time
 so they always match the installed ABI (needs `libclang`). To build against the
 committed bindings instead (no `libclang` required):
 
@@ -112,6 +125,36 @@ cargo test                       # everything, no camera needed
 cargo test --no-default-features # same, against the committed bindings
 ```
 
+Run `cargo test --workspace --all-features` to include the log bridge and its
+concurrent handle/native-operation regression test. CI also checks Rust 1.82,
+docs.rs builds, and both packaged crate archives.
+
+## Application integration
+
+Keep each `Camera` and `Context` on its owning thread. For a GUI, async server,
+or other application sharing a session, use `CameraThread` rather than adding
+unsafe `Send` or `Sync` implementations. Its `run` method blocks the calling
+thread, so invoke it from your runtime's blocking-work facility. Return owned
+values, such as `Vec<u8>`, strings, or configuration snapshots, from each job.
+See `cargo run -p gphoto2-bindings --example threaded`.
+
+Calling `run` from the same worker returns `ErrorKind::CameraBusy`. Dropping
+the final handle normally waits for queued work and releases the session; if
+that happens on the worker itself, cleanup follows the current job.
+
+The `tether` example selects an attached camera by port and collects multiple
+file events, including RAW+JPEG captures, with bounded waiting:
+
+```console
+cargo run -p gphoto2-bindings --example tether
+```
+
+With the `log` feature, one permanent C callback is initialized before native
+objects are created. `forward_to_log` handles only change synchronized Rust
+forwarding state. Multiple handles forward each message once at the most
+verbose active level. Other code using raw FFI must coordinate any changes it
+makes to libgphoto2's process-global callback registry.
+
 - **Virtual PTP camera (vcamera)** — for the paths the directory camera can't
   reach (capture, the config widget tree, events), `tests/vcamera.rs` drives
   libgphoto2's built-in **virtual PTP camera** (the `vusb` driver + `ptp2`
@@ -138,9 +181,18 @@ cargo test --no-default-features # same, against the committed bindings
 | -------- | ----- | ----- |
 | Linux    | ✅ supported | `pkg-config` finds the system package. |
 | macOS    | ✅ supported | `build.rs` auto-adds the Homebrew keg's `pkgconfig` dir. Note: capture/control of cameras can require quitting Photos/`PTPCamera`, which claim the USB device. |
-| Windows (MinGW) | ✅ supported | Build with the **GNU toolchain** in [MSYS2](https://www.msys2.org/): install `mingw-w64-x86_64-libgphoto2` and `pkg-config` resolves it normally. Covered by CI. |
-| Windows (MSVC) | ❌ unsupported | libgphoto2 has [no MSVC port](https://github.com/gphoto/libgphoto2/issues/33) and isn't in vcpkg — a libgphoto2 limitation, not this crate's. Use the MinGW path above. |
+| Windows (MSYS2 UCRT64) | ✅ supported | Use MSYS2's matching UCRT64 libgphoto2, pkgconf, and Rust packages together. Covered by CI. |
+| Windows (MSVC) | ❌ unsupported | Use the MSYS2 UCRT64 toolchain described above. |
 | docs.rs  | ✅ | Builds against committed bindings with linking disabled. |
+
+On Windows, use the Rust compiler supplied by the UCRT64 package along with
+its native libraries. Mixing a rustup GNU compiler, MINGW64 libraries, or a
+different C runtime is not a supported configuration: C allocations returned
+by libgphoto2 must be released through the same runtime. The older MINGW64
+libgphoto2 package is no longer provided by current MSYS2 repositories.
+The package command above supports `cargo build --no-default-features` without
+libclang. For default-feature builds, also install
+`mingw-w64-ucrt-x86_64-clang` in the same UCRT64 environment.
 
 ## Dependency choices (the "be smart for LTS" part)
 
@@ -149,7 +201,7 @@ Picked deliberately for a library meant to live a long time:
 - **`pkg-config`** + **`bindgen`** (build-time only) — the boring, universal way
   to find and bind a C library. Bindings are also committed so the crate builds
   where `libclang` isn't, and so `docs.rs` works.
-- **No runtime dependencies** in `gphoto2-sys` beyond `libc`-style `core::ffi`
+- **No runtime dependencies** in `gphoto2-bindings-sys` beyond `libc`-style `core::ffi`
   types from std. Fewer moving parts = fewer LTS liabilities.
 - **`thiserror`/`anyhow` deliberately avoided** in the core — the error type is a
   thin hand-rolled wrapper over libgphoto2's integer codes, so the public API
@@ -178,8 +230,10 @@ aspiration — a direction, not a commitment or a schedule.
    plus unit tests (the unsafe callback bridging is Miri-checked) and hardware-free
    integration tests against **both** the directory camera and the **virtual PTP
    camera (vcamera)** — the latter covering real capture / config / events.
-2. **Next** — partial/range reads (`gp_camera_file_read`) and publish prep (final
-   crate name, CHANGELOG, MSRV job).
+2. **Next** — partial/range reads (`gp_camera_file_read`) and direct-to-disk
+   downloads. The 0.1.0 release preparation includes distinct package names,
+   a [changelog](CHANGELOG.md), MSRV/package/docs checks, and the
+   [release procedure](RELEASING.md).
 
 **Maybe later — pure Rust (aspirational, not started)**
 
@@ -193,7 +247,7 @@ the honest framing.
 ## Licensing
 
 The original Rust code here is dual-licensed **MIT OR Apache-2.0** (your choice).
-That covers `gphoto2-sys` (FFI bindings) and `gphoto2` (the safe wrapper), which
+That covers `gphoto2-bindings-sys` (FFI bindings) and `gphoto2-bindings` (the safe wrapper), which
 only *link* libgphoto2 and contain no code copied from it.
 
 Two things to know:

@@ -4,18 +4,18 @@ members = ["crates/gphoto2-sys", "crates/gphoto2"]
 
 [workspace.package]
 edition = "2021"
-rust-version = "1.74"
+rust-version = "1.82"
 # Original Rust code (FFI bindings + safe wrapper) only *links* libgphoto2, so it
 # may be permissively licensed. Future crates that *port* libgphoto2's source to
 # Rust are derivative works and must be LGPL-2.1-or-later in their own crate.
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/SauceTaster/vibe-libgphoto2-rs"
-authors = ["vibe-libgphoto2-rs contributors"]
+repository = "https://github.com/SauceTaster/libgphoto2-rs"
+authors = ["libgphoto2-rs contributors"]
 
 # Pulled in by the safe wrapper. `default-features = false` here lets the
 # wrapper control whether libgphoto2-sys regenerates bindings at build time.
 [workspace.dependencies]
-gphoto2-sys = { path = "crates/gphoto2-sys", version = "0.1.0", default-features = false }
+gphoto2-sys = { package = "gphoto2-bindings-sys", path = "crates/gphoto2-sys", version = "0.1.0", default-features = false }
 
 # Optimize native deps even in dev so camera I/O is not painfully slow to test.
 [profile.dev.package."*"]

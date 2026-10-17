@@ -2,8 +2,8 @@
 //!
 //! Responsibilities, in order:
 //!   1. Tell Cargo when to re-run.
-//!   2. On docs.rs, do nothing but rely on the committed bindings (no system
-//!      libgphoto2 is available there, and we must not try to link).
+//!   2. On docs.rs, use the committed bindings (no system libgphoto2 is
+//!      available there, and we must not try to link).
 //!   3. Locate the native libgphoto2 + libgphoto2_port libraries and emit the
 //!      `cargo:rustc-link-*` directives so downstream crates link correctly.
 //!   4. (default feature) regenerate bindings against the located headers.
@@ -21,12 +21,23 @@ use std::path::PathBuf;
 fn main() {
     println!("cargo:rerun-if-changed=wrapper.h");
     println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed=src/bindings_pregenerated.rs");
+    println!("cargo:rerun-if-env-changed=DOCS_RS");
     println!("cargo:rerun-if-env-changed=GPHOTO2_INCLUDE_DIR");
     println!("cargo:rerun-if-env-changed=GPHOTO2_LIB_DIR");
     println!("cargo:rerun-if-env-changed=PKG_CONFIG_PATH");
 
     // docs.rs: no system library; use the committed bindings, never link.
     if env::var_os("DOCS_RS").is_some() {
+        // Features are unified across the dependency graph, so a dependent
+        // crate can enable bindgen even when this crate's docs.rs metadata
+        // disables it. Satisfy the same OUT_DIR include in either case.
+        #[cfg(feature = "buildtime-bindgen")]
+        std::fs::copy(
+            "src/bindings_pregenerated.rs",
+            PathBuf::from(env::var_os("OUT_DIR").expect("OUT_DIR not set")).join("bindings.rs"),
+        )
+        .expect("failed to copy committed libgphoto2 bindings for docs.rs");
         return;
     }
 
@@ -94,13 +105,15 @@ fn discovery_error(detail: &str) -> String {
     if target_os == "windows" {
         if target_env == "msvc" {
             msg.push_str(
-                "libgphoto2 has no native MSVC port; build for the GNU toolchain \
-                 (x86_64-pc-windows-gnu) inside MSYS2 instead.\n",
+                "libgphoto2 has no native MSVC port; use the MSYS2 UCRT64 Rust \
+                 toolchain (x86_64-pc-windows-gnu) instead.\n",
             );
         }
         msg.push_str(
-            "On Windows, use MSYS2/MinGW:\n  \
-             pacman -S mingw-w64-x86_64-libgphoto2 mingw-w64-x86_64-pkgconf\n",
+            "In an MSYS2 UCRT64 shell, install the matching native library and Rust toolchain:\n  \
+             pacman -S mingw-w64-ucrt-x86_64-libgphoto2 \
+             mingw-w64-ucrt-x86_64-pkgconf mingw-w64-ucrt-x86_64-rust\n\
+             Use the UCRT64 Rust toolchain so this crate and libgphoto2 share the same C allocator.\n",
         );
     } else {
         msg.push_str(
@@ -143,6 +156,10 @@ fn inject_homebrew_pkg_config_path() {
 fn generate_bindings(include_paths: &[PathBuf]) {
     let mut builder = bindgen::Builder::default()
         .header("wrapper.h")
+        .rust_target(
+            bindgen::RustTarget::stable(82, 0)
+                .unwrap_or_else(|err| panic!("invalid bindgen Rust target: {err}")),
+        )
         // Public surface only: gp_* functions, the GP_* constants (incl. error
         // codes and GP_MIME_*), and the Camera*/GP*/Gphoto* types they touch.
         .allowlist_function("gp_.*")

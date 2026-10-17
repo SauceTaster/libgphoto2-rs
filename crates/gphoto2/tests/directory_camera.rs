@@ -11,8 +11,9 @@ use std::cell::{Cell, RefCell};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
-use std::sync::Mutex;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{mpsc, Arc, Mutex};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use gphoto2::{
     supported_models, AccessType, Camera, CameraFile, CameraFilePath, Context, ErrorKind,
@@ -392,6 +393,14 @@ fn camera_thread_drives_a_session_off_thread() {
         .unwrap();
     assert_eq!(bytes, b"hello");
 
+    // A panicking job reports failure but leaves the session available.
+    assert_eq!(
+        cam.run::<(), _>(|_, _| panic!("camera job panicked"))
+            .unwrap_err()
+            .kind(),
+        ErrorKind::Generic
+    );
+
     // The handle is Send: move it to another thread and use it there.
     let count = std::thread::spawn(move || {
         cam.run(|camera, ctx| camera.list_files(ctx, "/"))
@@ -402,6 +411,50 @@ fn camera_thread_drives_a_session_off_thread() {
     .join()
     .unwrap();
     assert!(count >= 1);
+}
+
+#[test]
+fn camera_thread_rejects_nested_run_and_keeps_serving_jobs() {
+    let _g = lock();
+    let tmp = TempDir::new("nested-thread");
+    fs::write(tmp.path().join("x.jpg"), b"hello").unwrap();
+    let dir = tmp.path().to_path_buf();
+    let cam = Arc::new(
+        gphoto2::CameraThread::spawn(move || {
+            let ctx = Context::new()?;
+            let camera = open_directory_camera(&ctx, &dir)?;
+            Ok((ctx, camera))
+        })
+        .expect("spawn camera thread"),
+    );
+
+    let nested_cam = Arc::clone(&cam);
+    let caller_cam = Arc::clone(&cam);
+    let nested_ran = Arc::new(AtomicBool::new(false));
+    let nested_ran_in_job = Arc::clone(&nested_ran);
+    let (result_tx, result_rx) = mpsc::channel();
+    let caller = std::thread::spawn(move || {
+        let result = caller_cam.run(move |_, _| {
+            nested_cam.run(move |_, _| nested_ran_in_job.store(true, Ordering::SeqCst))
+        });
+        let _ = result_tx.send(result);
+    });
+
+    // Keep this bounded so a regression fails instead of hanging the suite.
+    let error = result_rx
+        .recv_timeout(Duration::from_secs(5))
+        .expect("nested run must return without deadlocking")
+        .expect("outer job should complete")
+        .expect_err("nested run should be rejected");
+    assert_eq!(error.kind(), ErrorKind::CameraBusy);
+    assert!(!nested_ran.load(Ordering::SeqCst));
+    caller.join().unwrap();
+
+    let files = cam
+        .run(|camera, ctx| camera.list_files(ctx, "/"))
+        .unwrap()
+        .unwrap();
+    assert!(files.iter().any(|name| name == "x.jpg"));
 }
 
 #[test]

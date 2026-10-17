@@ -1,6 +1,6 @@
 //! List the linked libgphoto2 version and any attached cameras.
 //!
-//! Run with: `cargo run -p gphoto2 --example detect`
+//! Run with: `cargo run -p gphoto2-bindings --example detect`
 
 use gphoto2::{library_version, Camera, Context};
 
