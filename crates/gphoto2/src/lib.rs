@@ -1,7 +1,7 @@
 //! Safe, idiomatic Rust bindings to [libgphoto2](http://www.gphoto.org/) —
 //! detect, capture from, and download files off thousands of digital cameras.
 //!
-//! This is the safe layer of `vibe-libgphoto2-rs`; it sits on top of the raw
+//! This is the safe layer of `libgphoto2-rs`; it sits on top of the raw
 //! FFI in [`gphoto2_sys`]. Resources (contexts, cameras, lists, files) are
 //! owned RAII types that free themselves on drop, and every fallible call
 //! returns a [`Result`] carrying libgphoto2's structured [`ErrorKind`].

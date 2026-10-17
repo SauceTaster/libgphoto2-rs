@@ -76,15 +76,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0cc23270f6e1808e30a928bdc84dea0b9b4136a8bc82338574f23baf47bbd280"
 
 [[package]]
-name = "gphoto2"
+name = "gphoto2-bindings"
 version = "0.1.0"
 dependencies = [
- "gphoto2-sys",
+ "gphoto2-bindings-sys",
  "log",
 ]
 
 [[package]]
-name = "gphoto2-sys"
+name = "gphoto2-bindings-sys"
 version = "0.1.0"
 dependencies = [
  "bindgen",

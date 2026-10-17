@@ -53,4 +53,4 @@ export "${loader_var}=$prefix/lib${existing:+:$existing}"
 
 echo ">> running vcamera tests"
 cd "$root"
-cargo test -p gphoto2 --test vcamera -- --test-threads=1
+cargo test -p gphoto2-bindings --test vcamera -- --test-threads=1

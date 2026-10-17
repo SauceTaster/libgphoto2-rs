@@ -1,13 +1,15 @@
 //! Raw, unsafe FFI bindings to [libgphoto2](http://www.gphoto.org/) and
 //! libgphoto2_port.
 //!
-//! This crate is the bottom layer of `vibe-libgphoto2-rs`. It contains only the
+//! This crate is the bottom layer of `libgphoto2-rs`. It contains only the
 //! machine-generated declarations and the linkage to the native library — no
-//! abstractions, no safety. Use the `gphoto2` crate for a safe API.
+//! abstractions, no safety. Use the `gphoto2-bindings` package for a safe API.
 //!
 //! By default the bindings are generated at build time against the libgphoto2
 //! installed on the host (see `build.rs`). With `--no-default-features` the
 //! committed bindings in `bindings_pregenerated.rs` are used instead.
+//! Documentation builds on docs.rs always use the committed bindings,
+//! including when `buildtime-bindgen` is enabled by a dependent crate.
 #![allow(
     non_upper_case_globals,
     non_camel_case_types,

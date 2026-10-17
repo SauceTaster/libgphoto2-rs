@@ -29,7 +29,56 @@ jobs:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --all --check
-      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+
+  msrv:
+    name: MSRV (Rust 1.82, ${{ matrix.features }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        features: ["--all-features", "--no-default-features"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install libgphoto2 + libclang
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgphoto2-dev pkg-config clang libclang-dev
+      - uses: dtolnay/rust-toolchain@1.82.0
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check --workspace --all-targets --locked ${{ matrix.features }}
+
+  docs:
+    name: docs.rs (${{ matrix.features || 'default features' }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        features: ["", "--all-features", "--no-default-features"]
+    env:
+      DOCS_RS: "1"
+      RUSTDOCFLAGS: -D warnings
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # No native libgphoto2 or libclang install: documentation must build
+      # entirely against the committed bindings, regardless of features.
+      - run: cargo doc --workspace --no-deps --locked ${{ matrix.features }}
+
+  package:
+    name: package verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install libgphoto2 + libclang
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgphoto2-dev pkg-config clang libclang-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build packaged crates and verify archive contents
+        run: bash ./scripts/check-packages.sh
 
   # Full suite (incl. the Directory-Browse virtual-camera integration tests,
   # which need the `directory` camlib + `disk` iolib shipped on these platforms).
@@ -57,11 +106,15 @@ jobs:
       - name: Test
         run: cargo test --workspace --all-targets
       - name: Test (log feature)
-        run: cargo test -p gphoto2 --features log
+        run: cargo test -p gphoto2-bindings --features log
       - name: Doc tests
         run: cargo test --workspace --doc
-      - name: Verify committed-bindings path also builds
-        run: cargo build --workspace --no-default-features
+      - name: Test (committed bindings)
+        run: cargo test --workspace --all-targets --no-default-features
+      - name: Verify docs.rs environment transitions
+        run: |
+          DOCS_RS=1 cargo doc --workspace --no-deps --all-features
+          cargo test --workspace --lib --all-features
 
   # libgphoto2 has no MSVC port, so Windows support is via the GNU toolchain in
   # MSYS2/MinGW. We build everything and run the unit tests (which exercise the
@@ -130,7 +183,7 @@ jobs:
         with:
           components: miri
       - uses: Swatinem/rust-cache@v2
-      - run: cargo miri test --workspace --lib
+      - run: cargo miri test --workspace --lib --all-features
 
   # AddressSanitizer over the real C boundary: build libgphoto2 (vusb+ptp2) with
   # ASan and run the vcamera tests instrumented, catching out-of-bounds / UAF in
