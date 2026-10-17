@@ -105,13 +105,15 @@ fn discovery_error(detail: &str) -> String {
     if target_os == "windows" {
         if target_env == "msvc" {
             msg.push_str(
-                "libgphoto2 has no native MSVC port; build for the GNU toolchain \
-                 (x86_64-pc-windows-gnu) inside MSYS2 instead.\n",
+                "libgphoto2 has no native MSVC port; use the MSYS2 UCRT64 Rust \
+                 toolchain (x86_64-pc-windows-gnu) instead.\n",
             );
         }
         msg.push_str(
-            "On Windows, use MSYS2/MinGW:\n  \
-             pacman -S mingw-w64-x86_64-libgphoto2 mingw-w64-x86_64-pkgconf\n",
+            "In an MSYS2 UCRT64 shell, install the matching native library and Rust toolchain:\n  \
+             pacman -S mingw-w64-ucrt-x86_64-libgphoto2 \
+             mingw-w64-ucrt-x86_64-pkgconf mingw-w64-ucrt-x86_64-rust\n\
+             Use the UCRT64 Rust toolchain so this crate and libgphoto2 share the same C allocator.\n",
         );
     } else {
         msg.push_str(

@@ -7,8 +7,9 @@ use std::ffi::CStr;
 // that the caller must release. We bind libc `free` directly rather than pull in
 // the `libc` crate. Sound only when this binary and libgphoto2 share one C
 // allocator, which holds on every supported configuration: a single system libc
-// on Linux/macOS, and on Windows the MSYS2/MINGW64 toolchain where the camlib
-// DLLs and this crate link the same MinGW CRT.
+// on Linux/macOS, and on Windows the matching MSYS2/UCRT64 Rust and libgphoto2
+// packages, where the camlib DLLs and this crate link the same UCRT. Mixing
+// rustup GNU or MINGW64 libraries with that installation is not supported.
 extern "C" {
     fn free(ptr: *mut c_void);
 }

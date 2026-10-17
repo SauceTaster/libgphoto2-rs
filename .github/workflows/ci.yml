@@ -79,6 +79,11 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Build packaged crates and verify archive contents
         run: bash ./scripts/check-packages.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: crate-release-candidate
+          path: target/package-check/package/*.crate
+          if-no-files-found: error
 
   # Full suite (incl. the Directory-Browse virtual-camera integration tests,
   # which need the `directory` camlib + `disk` iolib shipped on these platforms).
@@ -116,14 +121,15 @@ jobs:
           DOCS_RS=1 cargo doc --workspace --no-deps --all-features
           cargo test --workspace --lib --all-features
 
-  # libgphoto2 has no MSVC port, so Windows support is via the GNU toolchain in
-  # MSYS2/MinGW. We build everything and run the unit tests (which exercise the
-  # core FFI: errors, strings, version, widget tree). The virtual-camera
-  # integration tests need camlibs/iolibs that aren't reliably packaged for
-  # Windows, so they run on Linux/macOS above.
+  # Use matching UCRT64 packages for Rust, the linker, and libgphoto2. These
+  # must share a C runtime because the wrapper frees allocations from the DLL.
+  # MSYS2 no longer packages libgphoto2 for the older MINGW64 environment.
+  # Virtual-camera integration tests continue to run on Linux/macOS above.
   windows:
-    name: test (windows / mingw64)
+    name: test (windows / ucrt64)
     runs-on: windows-latest
+    env:
+      CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER: gcc
     defaults:
       run:
         shell: msys2 {0}
@@ -131,20 +137,28 @@ jobs:
       - uses: actions/checkout@v4
       - uses: msys2/setup-msys2@v2
         with:
-          msystem: MINGW64
+          msystem: UCRT64
           update: true
           install: >-
-            mingw-w64-x86_64-libgphoto2
-            mingw-w64-x86_64-pkgconf
-            mingw-w64-x86_64-rust
-      - name: Versions
+            mingw-w64-ucrt-x86_64-libgphoto2
+            mingw-w64-ucrt-x86_64-pkgconf
+            mingw-w64-ucrt-x86_64-rust
+      - name: Verify UCRT64 toolchain and versions
         run: |
+          test "$MSYSTEM" = UCRT64
+          [[ "$(command -v cargo)" == /ucrt64/bin/* ]]
+          [[ "$(command -v rustc)" == /ucrt64/bin/* ]]
+          [[ "$(command -v gcc)" == /ucrt64/bin/* ]]
           cargo --version
+          rustc -vV
           pkg-config --modversion libgphoto2
+          objdump -p /ucrt64/bin/libgphoto2-6.dll | grep 'DLL Name:'
       - name: Build (committed bindings; no libclang needed)
-        run: cargo build --workspace --all-targets --no-default-features
+        run: cargo build --workspace --all-targets --no-default-features --features log --locked
       - name: Unit tests
-        run: cargo test --workspace --lib --no-default-features
+        run: cargo test --workspace --lib --no-default-features --features log --locked
+      - name: Logging integration tests
+        run: cargo test -p gphoto2-bindings --test logging --no-default-features --features log --locked
 
   # Build libgphoto2 from the vendored source with its virtual PTP camera
   # (--enable-vusb + ptp2) and run the vcamera tests against it. This is the only

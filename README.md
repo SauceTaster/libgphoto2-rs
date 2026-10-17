@@ -81,7 +81,7 @@ You need libgphoto2 (+ libgphoto2_port) and a C toolchain.
 | macOS           | `brew install libgphoto2 pkgconf`                          |
 | Debian / Ubuntu | `sudo apt install libgphoto2-dev pkg-config clang`         |
 | Fedora          | `sudo dnf install libgphoto2-devel pkgconf-pkg-config clang` |
-| Windows (MSYS2) | In a MINGW64 shell: `pacman -S mingw-w64-x86_64-libgphoto2 mingw-w64-x86_64-pkgconf mingw-w64-x86_64-rust` |
+| Windows (MSYS2) | In a **UCRT64** shell: `pacman -S mingw-w64-ucrt-x86_64-libgphoto2 mingw-w64-ucrt-x86_64-pkgconf mingw-w64-ucrt-x86_64-rust` |
 
 ```console
 cargo build
@@ -181,9 +181,18 @@ makes to libgphoto2's process-global callback registry.
 | -------- | ----- | ----- |
 | Linux    | ✅ supported | `pkg-config` finds the system package. |
 | macOS    | ✅ supported | `build.rs` auto-adds the Homebrew keg's `pkgconfig` dir. Note: capture/control of cameras can require quitting Photos/`PTPCamera`, which claim the USB device. |
-| Windows (MinGW) | ✅ supported | Build with the **GNU toolchain** in [MSYS2](https://www.msys2.org/): install `mingw-w64-x86_64-libgphoto2` and `pkg-config` resolves it normally. Covered by CI. |
-| Windows (MSVC) | ❌ unsupported | libgphoto2 has [no MSVC port](https://github.com/gphoto/libgphoto2/issues/33) and isn't in vcpkg — a libgphoto2 limitation, not this crate's. Use the MinGW path above. |
+| Windows (MSYS2 UCRT64) | ✅ supported | Use MSYS2's matching UCRT64 libgphoto2, pkgconf, and Rust packages together. Covered by CI. |
+| Windows (MSVC) | ❌ unsupported | Use the MSYS2 UCRT64 toolchain described above. |
 | docs.rs  | ✅ | Builds against committed bindings with linking disabled. |
+
+On Windows, use the Rust compiler supplied by the UCRT64 package along with
+its native libraries. Mixing a rustup GNU compiler, MINGW64 libraries, or a
+different C runtime is not a supported configuration: C allocations returned
+by libgphoto2 must be released through the same runtime. The older MINGW64
+libgphoto2 package is no longer provided by current MSYS2 repositories.
+The package command above supports `cargo build --no-default-features` without
+libclang. For default-feature builds, also install
+`mingw-w64-ucrt-x86_64-clang` in the same UCRT64 environment.
 
 ## Dependency choices (the "be smart for LTS" part)
 

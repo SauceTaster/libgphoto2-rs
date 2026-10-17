@@ -25,6 +25,8 @@ Initial crates.io release of the existing safe wrapper and raw FFI as
   documentation build checks to CI.
 - Include the unchanged MIT and Apache-2.0 license texts in both crate archives.
 - Correct repository metadata and links in published READMEs.
+- Update Windows CI and installation instructions to MSYS2 UCRT64, using a
+  matching Rust/native-library C runtime after MINGW64 packaging was removed.
 - Expand tethering to collect multiple captured files with bounded waits, and
   add an example for shared camera-thread sessions and owned configuration data.
 
